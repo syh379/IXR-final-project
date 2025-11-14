@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6941c7ce5c876be47bc4c8b2d041b12f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - xAxisLine: {instanceID: 0}
+  - yAxisLine: {instanceID: 0}
+  - zAxisLine: {instanceID: 0}
+  - lineMaterial: {fileID: 2100000, guid: 64c36a2a264da5342bf6aebfb867a058, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
