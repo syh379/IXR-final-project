@@ -5,7 +5,7 @@ using UnityEngine.UI;
 public class HandleMenu : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private CoordinateSpaceController coordinateSpace; // Coordinate system root
+    [SerializeField] private CoordinateSpaceController coordinateSpace; // Auto-resolved at runtime
 
     [Header("Shape Selection (ToggleGroup)")]
     [SerializeField] private ToggleGroup shapeToggleGroup;
@@ -24,14 +24,13 @@ public class HandleMenu : MonoBehaviour
 
     void Awake()
     {
-        // CreateOrReplaceShape(PrimitiveType.Cube, "OriginCube");
+        ResolveCoordinateSpace(); // use preview if available
 
         // Register listeners
         if (cubeToggle != null) cubeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cubeToggle, isOn));
         if (sphereToggle != null) sphereToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(sphereToggle, isOn));
         if (cylinderToggle != null) cylinderToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cylinderToggle, isOn));
         if (deleteToggle != null) deleteToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(deleteToggle, isOn));
-
     }
 
     void OnDestroy()
@@ -45,6 +44,9 @@ public class HandleMenu : MonoBehaviour
     // Keep shape anchored; ensure its min corner stays at (0,0,0)
     void LateUpdate()
     {
+        // If preview was hidden after placement, switch to the placed instance automatically
+        ResolveCoordinateSpace();
+
         if (originShape != null && coordinateSpace != null && originShape.transform.parent != coordinateSpace.transform)
         {
             originShape.transform.SetParent(coordinateSpace.transform, false);
@@ -81,9 +83,11 @@ public class HandleMenu : MonoBehaviour
 
     private void CreateOrReplaceShape(PrimitiveType type, string shapeName)
     {
+        ResolveCoordinateSpace();
+
         if (coordinateSpace == null)
         {
-            Debug.LogWarning("HandleMenu: CoordinateSpace reference not set.");
+            Debug.LogWarning("HandleMenu: CoordinateSpace reference not set or not found (preview/placed).");
             return;
         }
 
@@ -113,25 +117,19 @@ public class HandleMenu : MonoBehaviour
 
     private Vector3 ComputePositiveSideOffset(GameObject shape)
     {
-        // Use mesh bounds in local mesh space then scale
         var mf = shape.GetComponent<MeshFilter>();
         if (mf == null || mf.sharedMesh == null)
             return Vector3.zero;
 
         Bounds meshBounds = mf.sharedMesh.bounds; // in mesh local coordinates
-        // meshBounds.center is usually (0,0,0). extents are half-size in mesh units.
-        // Offset = scaled extents so min corner aligns with origin.
         Vector3 extents = meshBounds.extents;
 
-        // Adjust for non-uniform scale: extents * scale
-        Vector3 scaledExtents = new Vector3(
+        // Adjust for non-uniform scale
+        return new Vector3(
             extents.x * shape.transform.localScale.x,
             extents.y * shape.transform.localScale.y,
             extents.z * shape.transform.localScale.z
         );
-
-        // Special case: Unity cylinder has height 2 (extents.y = 1). This logic already handles it.
-        return scaledExtents;
     }
 
     private void DestroyOriginShape()
@@ -141,6 +139,37 @@ public class HandleMenu : MonoBehaviour
             Destroy(originShape);
             originShape = null;
             currentShapeOffset = Vector3.zero;
+        }
+    }
+
+    // Attempts to use the preview first, then the placed coordinate space.
+    private void ResolveCoordinateSpace()
+    {
+        // If we already have an active reference, keep it
+        if (coordinateSpace != null && coordinateSpace.gameObject.activeInHierarchy) return;
+
+        // 1) Try the preview created by CoordinateSpacePlacer
+        var previewGO = GameObject.Find("CoordinateSpace_Preview");
+        if (previewGO != null && previewGO.activeInHierarchy)
+        {
+            var previewCtrl = previewGO.GetComponent<CoordinateSpaceController>();
+            if (previewCtrl != null)
+            {
+                coordinateSpace = previewCtrl;
+                return;
+            }
+        }
+
+        // 2) Fallback: find any active placed CoordinateSpaceController (not the preview)
+#if UNITY_2023_1_OR_NEWER
+        var candidates = Object.FindObjectsByType<CoordinateSpaceController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+#else
+        var candidates = Object.FindObjectsOfType<CoordinateSpaceController>();
+#endif
+        var placed = candidates.FirstOrDefault(c => c != null && c.gameObject.activeInHierarchy && c.gameObject.name != "CoordinateSpace_Preview");
+        if (placed != null)
+        {
+            coordinateSpace = placed;
         }
     }
 

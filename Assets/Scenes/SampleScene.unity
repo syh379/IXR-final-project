@@ -5023,6 +5023,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: CoordinateSpace
       objectReference: {fileID: 0}
+    - target: {fileID: 5483716070403720287, guid: 24313fca8c6f031489d3c85594cce3af, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6149519985441143258, guid: 24313fca8c6f031489d3c85594cce3af, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
