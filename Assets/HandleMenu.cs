@@ -13,6 +13,7 @@ public class HandleMenu : MonoBehaviour
     [SerializeField] private Toggle sphereToggle;
     [SerializeField] private Toggle cylinderToggle;
     [SerializeField] private Toggle deleteToggle; // selecting this removes the current shape
+    [SerializeField] private Toggle coneToggle;   // NEW: cone toggle
 
     [Header("Shape Settings")]
     [SerializeField] private Vector3 shapeScale = Vector3.one * 1f;
@@ -31,6 +32,7 @@ public class HandleMenu : MonoBehaviour
         if (sphereToggle != null) sphereToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(sphereToggle, isOn));
         if (cylinderToggle != null) cylinderToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cylinderToggle, isOn));
         if (deleteToggle != null) deleteToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(deleteToggle, isOn));
+        if (coneToggle != null) coneToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(coneToggle, isOn));
     }
 
     void OnDestroy()
@@ -39,12 +41,12 @@ public class HandleMenu : MonoBehaviour
         if (sphereToggle != null) sphereToggle.onValueChanged.RemoveAllListeners();
         if (cylinderToggle != null) cylinderToggle.onValueChanged.RemoveAllListeners();
         if (deleteToggle != null) deleteToggle.onValueChanged.RemoveAllListeners();
+        if (coneToggle != null) coneToggle.onValueChanged.RemoveAllListeners();
     }
 
     // Keep shape anchored; ensure its min corner stays at (0,0,0)
     void LateUpdate()
     {
-        // If preview was hidden after placement, switch to the placed instance automatically
         ResolveCoordinateSpace();
 
         if (originShape != null && coordinateSpace != null && originShape.transform.parent != coordinateSpace.transform)
@@ -66,22 +68,27 @@ public class HandleMenu : MonoBehaviour
         }
         if (cubeToggle != null && source == cubeToggle)
         {
-            CreateOrReplaceShape(PrimitiveType.Cube, "OriginCube");
+            CreateOrReplacePrimitive(PrimitiveType.Cube, "OriginCube");
             return;
         }
         if (sphereToggle != null && source == sphereToggle)
         {
-            CreateOrReplaceShape(PrimitiveType.Sphere, "OriginSphere");
+            CreateOrReplacePrimitive(PrimitiveType.Sphere, "OriginSphere");
             return;
         }
         if (cylinderToggle != null && source == cylinderToggle)
         {
-            CreateOrReplaceShape(PrimitiveType.Cylinder, "OriginCylinder");
+            CreateOrReplacePrimitive(PrimitiveType.Cylinder, "OriginCylinder");
+            return;
+        }
+        if (coneToggle != null && source == coneToggle)
+        {
+            CreateOrReplaceCone("OriginCone");
             return;
         }
     }
 
-    private void CreateOrReplaceShape(PrimitiveType type, string shapeName)
+    private void CreateOrReplacePrimitive(PrimitiveType type, string shapeName)
     {
         ResolveCoordinateSpace();
 
@@ -104,7 +111,7 @@ public class HandleMenu : MonoBehaviour
         originShape.transform.localRotation = Quaternion.identity;
         originShape.transform.localScale = shapeScale;
 
-        // Compute offset so the object's local AABB min corner is at (0,0,0)
+        // Compute offset so min AABB corner aligns at origin (positive octant)
         currentShapeOffset = ComputePositiveSideOffset(originShape);
         originShape.transform.localPosition = currentShapeOffset;
 
@@ -115,21 +122,57 @@ public class HandleMenu : MonoBehaviour
         }
     }
 
+    private void CreateOrReplaceCone(string shapeName)
+    {
+        ResolveCoordinateSpace();
+
+        if (coordinateSpace == null)
+        {
+            Debug.LogWarning("HandleMenu: CoordinateSpace reference not set or not found (preview/placed).");
+            return;
+        }
+
+        if (originShape != null)
+        {
+            Destroy(originShape);
+            originShape = null;
+        }
+
+        originShape = new GameObject(shapeName);
+        originShape.transform.SetParent(coordinateSpace.transform, false);
+
+        var mf = originShape.AddComponent<MeshFilter>();
+        var mr = originShape.AddComponent<MeshRenderer>();
+
+        // Build a unit-like cone (radius 0.5, height 1) so extents are ~0.5 in X/Z and 0.5 in Y
+        mf.sharedMesh = ProceduralCone.Build(0.5f, 1f, 32, capBase: true);
+
+        // Optional collider (similar to primitives having colliders)
+        var mc = originShape.AddComponent<MeshCollider>();
+        mc.sharedMesh = mf.sharedMesh;
+        mc.convex = true;
+
+        if (shapeMaterial != null) mr.material = shapeMaterial;
+
+        originShape.transform.localRotation = Quaternion.identity;
+        originShape.transform.localScale = shapeScale;
+
+        // Keep entire shape in positive octant using current extents-based logic
+        currentShapeOffset = ComputePositiveSideOffset(originShape);
+        originShape.transform.localPosition = currentShapeOffset;
+    }
+
     private Vector3 ComputePositiveSideOffset(GameObject shape)
     {
         var mf = shape.GetComponent<MeshFilter>();
         if (mf == null || mf.sharedMesh == null)
             return Vector3.zero;
 
-        Bounds meshBounds = mf.sharedMesh.bounds; // in mesh local coordinates
-        Vector3 extents = meshBounds.extents;
-
-        // Adjust for non-uniform scale
-        return new Vector3(
-            extents.x * shape.transform.localScale.x,
-            extents.y * shape.transform.localScale.y,
-            extents.z * shape.transform.localScale.z
-        );
+        // Works correctly when mesh.bounds.center == (0,0,0)
+        var b = mf.sharedMesh.bounds;
+        var ext = b.extents;
+        var s = shape.transform.localScale;
+        return new Vector3(ext.x * s.x, ext.y * s.y, ext.z * s.z);
     }
 
     private void DestroyOriginShape()
@@ -142,13 +185,10 @@ public class HandleMenu : MonoBehaviour
         }
     }
 
-    // Attempts to use the preview first, then the placed coordinate space.
     private void ResolveCoordinateSpace()
     {
-        // If we already have an active reference, keep it
         if (coordinateSpace != null && coordinateSpace.gameObject.activeInHierarchy) return;
 
-        // 1) Try the preview created by CoordinateSpacePlacer
         var previewGO = GameObject.Find("CoordinateSpace_Preview");
         if (previewGO != null && previewGO.activeInHierarchy)
         {
@@ -160,7 +200,6 @@ public class HandleMenu : MonoBehaviour
             }
         }
 
-        // 2) Fallback: find any active placed CoordinateSpaceController (not the preview)
 #if UNITY_2023_1_OR_NEWER
         var candidates = Object.FindObjectsByType<CoordinateSpaceController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 #else
@@ -173,9 +212,10 @@ public class HandleMenu : MonoBehaviour
         }
     }
 
-    // Optional public methods (compatibility)
+    // Optional public compatibility
     public void OnRemoveShapeClicked() => DestroyOriginShape();
-    public void OnAddCubeClicked() => CreateOrReplaceShape(PrimitiveType.Cube, "OriginCube");
-    public void OnAddSphereClicked() => CreateOrReplaceShape(PrimitiveType.Sphere, "OriginSphere");
-    public void OnAddCylinderClicked() => CreateOrReplaceShape(PrimitiveType.Cylinder, "OriginCylinder");
+    public void OnAddCubeClicked() => CreateOrReplacePrimitive(PrimitiveType.Cube, "OriginCube");
+    public void OnAddSphereClicked() => CreateOrReplacePrimitive(PrimitiveType.Sphere, "OriginSphere");
+    public void OnAddCylinderClicked() => CreateOrReplacePrimitive(PrimitiveType.Cylinder, "OriginCylinder");
+    public void OnAddConeClicked() => CreateOrReplaceCone("OriginCone");
 }
