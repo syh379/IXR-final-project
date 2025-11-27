@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic; // REQUIRED: Adds Lists and Stacks
 using Oculus.Interaction;
 using Oculus.Interaction.Input;
 
@@ -11,6 +12,13 @@ public class MetaPen : MonoBehaviour
 
     [Header("Auto-Filled")]
     public Grabbable grabbable;
+
+    // --- NEW VARIABLES ---
+    // Stores the history of lines
+    private Stack<GameObject> drawingHistory = new Stack<GameObject>(); 
+    // Prevents the undo from triggering 60 times a second
+    private bool isUndoTriggerDown = false; 
+    // ---------------------
 
     private GameObject currentDrawing;
     private OVRInput.Controller activeController = OVRInput.Controller.None;
@@ -34,15 +42,12 @@ public class MetaPen : MonoBehaviour
         // CASE 1: We just grabbed the pen
         if (evt.Type == PointerEventType.Select)
         {
-            // The 'Data' is the Interactor (the hand/controller)
             if (evt.Data is MonoBehaviour interactor)
             {
-                // LOGGING: Let's see what exactly grabbed us
                 string interactorName = interactor.name;
                 string parentName = interactor.transform.parent ? interactor.transform.parent.name : "NoParent";
                 Debug.Log($"[MetaPen] Grabbed by Object: {interactorName}, Parent: {parentName}");
 
-                // IMPROVED DETECTION: Check the object name AND the parent name for "Left" or "Right"
                 if (interactorName.Contains("Left") || parentName.Contains("Left"))
                 {
                     activeController = OVRInput.Controller.LTouch;
@@ -55,7 +60,6 @@ public class MetaPen : MonoBehaviour
                 }
                 else
                 {
-                    // Fallback: If we can't tell, assume Right Hand (common for testing)
                     Debug.LogWarning("[MetaPen] Could not identify Left/Right. Defaulting to Right Touch.");
                     activeController = OVRInput.Controller.RTouch;
                 }
@@ -65,8 +69,9 @@ public class MetaPen : MonoBehaviour
         else if (evt.Type == PointerEventType.Unselect)
         {
             Debug.Log("[MetaPen] Pen Dropped");
+            // Important: We must call EndDraw BEFORE clearing the controller so we save the final line
+            if (isDrawing) EndDraw(); 
             activeController = OVRInput.Controller.None;
-            EndDraw();
         }
     }
 
@@ -75,21 +80,63 @@ public class MetaPen : MonoBehaviour
         // If not holding, stop
         if (activeController == OVRInput.Controller.None) return;
 
-        // Read Trigger Value (0.0 to 1.0)
+        // ---------------------------------------------------------
+        // 1. DRAWING LOGIC (Holding Hand)
+        // ---------------------------------------------------------
         float triggerValue = OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, activeController);
-
-        // LOGGING: Uncomment this line if you suspect the trigger isn't working at all
-        // Debug.Log($"Trigger Value: {triggerValue}");
 
         if (triggerValue > 0.2f && !isDrawing)
         {
-            Debug.Log("[MetaPen] Start Drawing");
             StartDraw();
         }
         else if (triggerValue < 0.1f && isDrawing)
         {
-            Debug.Log("[MetaPen] Stop Drawing");
             EndDraw();
+        }
+
+        // ---------------------------------------------------------
+        // 2. UNDO LOGIC (Other Hand)
+        // ---------------------------------------------------------
+        CheckUndoInput();
+    }
+
+    void CheckUndoInput()
+    {
+        // Determine which hand is the "Other" hand
+        OVRInput.Controller otherHand = (activeController == OVRInput.Controller.LTouch) 
+                                        ? OVRInput.Controller.RTouch 
+                                        : OVRInput.Controller.LTouch;
+
+        // Read the trigger of the OTHER hand
+        float undoValue = OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, otherHand);
+
+        // If pressed past 50%
+        if (undoValue > 0.5f)
+        {
+            // Only fire once per press (Debounce)
+            if (!isUndoTriggerDown)
+            {
+                UndoLastStroke();
+                isUndoTriggerDown = true;
+            }
+        }
+        else
+        {
+            // Reset when released
+            isUndoTriggerDown = false;
+        }
+    }
+
+    void UndoLastStroke()
+    {
+        if (drawingHistory.Count > 0)
+        {
+            GameObject lastStroke = drawingHistory.Pop();
+            if (lastStroke != null)
+            {
+                Destroy(lastStroke);
+                Debug.Log("[MetaPen] Undid last stroke. Remaining: " + drawingHistory.Count);
+            }
         }
     }
 
@@ -98,15 +145,13 @@ public class MetaPen : MonoBehaviour
         isDrawing = true;
         currentDrawing = new GameObject("DrawLine");
         
-        // Create the visual line
         TrailRenderer trail = currentDrawing.AddComponent<TrailRenderer>();
         trail.time = Mathf.Infinity; 
-        trail.minVertexDistance = 0.005f; // High fidelity
+        trail.minVertexDistance = 0.005f; 
         trail.startWidth = lineWidth;
         trail.endWidth = lineWidth;
         trail.material = lineMaterial;
 
-        // Important: Reset position to tip before parenting
         currentDrawing.transform.position = penTip.position;
         currentDrawing.transform.rotation = Quaternion.identity;
         currentDrawing.transform.parent = penTip;
@@ -118,6 +163,10 @@ public class MetaPen : MonoBehaviour
         if (currentDrawing != null)
         {
             currentDrawing.transform.parent = null;
+            
+            // --- NEW: Add the finished line to our history stack ---
+            drawingHistory.Push(currentDrawing);
+            
             currentDrawing = null;
         }
     }
