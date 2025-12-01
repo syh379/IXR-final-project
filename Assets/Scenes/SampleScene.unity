@@ -243,6 +243,7 @@ MonoBehaviour:
   cylinderToggle: {fileID: 1911282916}
   deleteToggle: {fileID: 792743680}
   coneToggle: {fileID: 955633180}
+  doubleConeToggle: {fileID: 494245490}
   shapeScale: {x: 1, y: 1, z: 1}
   shapeMaterial: {fileID: 2100000, guid: 3ce63fee3c2bccd45ae1b243ff263e62, type: 2}
   penToggle: {fileID: 929318446}
@@ -940,6 +941,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 804765e8da96b404fb7767affc7d8a57, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &494245490 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1424799317149185144, guid: d6733f35cecdc984c9d50925eb25939e, type: 3}
+  m_PrefabInstance: {fileID: 851199854}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!1 &583818777
@@ -2448,6 +2460,10 @@ PrefabInstance:
     - target: {fileID: 7576783795745304079, guid: d6733f35cecdc984c9d50925eb25939e, type: 3}
       propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
       value: 1801810542
+      objectReference: {fileID: 0}
+    - target: {fileID: 7681025808444490798, guid: d6733f35cecdc984c9d50925eb25939e, type: 3}
+      propertyPath: m_text
+      value: Add BiCone
       objectReference: {fileID: 0}
     - target: {fileID: 7681025808444490798, guid: d6733f35cecdc984c9d50925eb25939e, type: 3}
       propertyPath: 'm_ActiveFontFeatures.Array.data[0]'

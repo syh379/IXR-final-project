@@ -237,6 +237,7 @@ public class HandleMenu : MonoBehaviour
     [SerializeField] private Toggle cylinderToggle;
     [SerializeField] private Toggle deleteToggle; 
     [SerializeField] private Toggle coneToggle;   
+    [SerializeField] private Toggle doubleConeToggle; // NEW: double-cone (bicone) toggle
 
     [Header("Shape Settings")]
     [SerializeField] private Vector3 shapeScale = Vector3.one * 1f;
@@ -265,6 +266,7 @@ public class HandleMenu : MonoBehaviour
         if (cylinderToggle != null) cylinderToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cylinderToggle, isOn));
         if (deleteToggle != null) deleteToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(deleteToggle, isOn));
         if (coneToggle != null) coneToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(coneToggle, isOn));
+    if (doubleConeToggle != null) doubleConeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(doubleConeToggle, isOn));
         
         // --- NEW LISTENER ---
         if (penToggle != null) penToggle.onValueChanged.AddListener(isOn => OnPenToggleChanged(isOn));
@@ -277,6 +279,7 @@ public class HandleMenu : MonoBehaviour
         if (cylinderToggle != null) cylinderToggle.onValueChanged.RemoveAllListeners();
         if (deleteToggle != null) deleteToggle.onValueChanged.RemoveAllListeners();
         if (coneToggle != null) coneToggle.onValueChanged.RemoveAllListeners();
+    if (doubleConeToggle != null) doubleConeToggle.onValueChanged.RemoveAllListeners();
         
         // --- NEW REMOVE LISTENER ---
         if (penToggle != null) penToggle.onValueChanged.RemoveAllListeners();
@@ -371,6 +374,11 @@ public class HandleMenu : MonoBehaviour
             CreateOrReplaceCone("OriginCone");
             return;
         }
+        if (doubleConeToggle != null && source == doubleConeToggle)
+        {
+            CreateOrReplaceDoubleCone("OriginDoubleCone");
+            return;
+        }
     }
 
     private void CreateOrReplacePrimitive(PrimitiveType type, string shapeName)
@@ -426,6 +434,43 @@ public class HandleMenu : MonoBehaviour
 
         // Assumes you have ProceduralCone class elsewhere
         mf.sharedMesh = ProceduralCone.Build(0.5f, 1f, 32, capBase: true);
+
+        var mc = originShape.AddComponent<MeshCollider>();
+        mc.sharedMesh = mf.sharedMesh;
+        mc.convex = true;
+
+        if (shapeMaterial != null) mr.material = shapeMaterial;
+
+        originShape.transform.localRotation = Quaternion.identity;
+        originShape.transform.localScale = shapeScale;
+
+        currentShapeOffset = ComputePositiveSideOffset(originShape);
+        originShape.transform.localPosition = currentShapeOffset;
+    }
+
+    private void CreateOrReplaceDoubleCone(string shapeName)
+    {
+        ResolveCoordinateSpace();
+
+        if (coordinateSpace == null)
+        {
+            Debug.LogWarning("HandleMenu: CoordinateSpace reference not set or not found (preview/placed).");
+            return;
+        }
+
+        if (originShape != null)
+        {
+            Destroy(originShape);
+            originShape = null;
+        }
+
+        originShape = new GameObject(shapeName);
+        originShape.transform.SetParent(coordinateSpace.transform, false);
+
+        var mf = originShape.AddComponent<MeshFilter>();
+        var mr = originShape.AddComponent<MeshRenderer>();
+
+        mf.sharedMesh = ProceduralDoubleCone.Build(0.5f, 1f, 32);
 
         var mc = originShape.AddComponent<MeshCollider>();
         mc.sharedMesh = mf.sharedMesh;
