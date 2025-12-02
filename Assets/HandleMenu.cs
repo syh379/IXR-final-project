@@ -228,7 +228,8 @@ using UnityEngine.UI;
 public class HandleMenu : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private CoordinateSpaceController coordinateSpace; 
+    [SerializeField] private CoordinateSpaceController coordinateSpace;
+    [SerializeField] private CoordinateSpacePlacer coordinateSpacePlacer; // For unanchoring control 
 
     [Header("Shape Selection (ToggleGroup)")]
     [SerializeField] private ToggleGroup shapeToggleGroup;
@@ -237,7 +238,11 @@ public class HandleMenu : MonoBehaviour
     [SerializeField] private Toggle cylinderToggle;
     [SerializeField] private Toggle deleteToggle; 
     [SerializeField] private Toggle coneToggle;   
-    [SerializeField] private Toggle doubleConeToggle; // NEW: double-cone (bicone) toggle
+    [SerializeField] private Toggle doubleConeToggle;
+    
+    [Header("Coordinate Space Control")]
+    [SerializeField] private Toggle unanchorToggle; // Toggle to unanchor coordinate space
+    [SerializeField] private Toggle autoExtendToggle; // Toggle for auto-extending axes
 
     [Header("Shape Settings")]
     [SerializeField] private Vector3 shapeScale = Vector3.one * 1f;
@@ -268,8 +273,22 @@ public class HandleMenu : MonoBehaviour
         if (coneToggle != null) coneToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(coneToggle, isOn));
     if (doubleConeToggle != null) doubleConeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(doubleConeToggle, isOn));
         
-        // --- NEW LISTENER ---
+        // Pen toggle
         if (penToggle != null) penToggle.onValueChanged.AddListener(isOn => OnPenToggleChanged(isOn));
+        
+        // Coordinate space controls
+        if (unanchorToggle != null) unanchorToggle.onValueChanged.AddListener(isOn => OnUnanchorToggleChanged(isOn));
+        if (autoExtendToggle != null) autoExtendToggle.onValueChanged.AddListener(isOn => OnAutoExtendToggleChanged(isOn));
+        
+        // Subscribe to unanchor state changes for UI sync
+        if (coordinateSpacePlacer == null)
+        {
+            coordinateSpacePlacer = FindFirstObjectByType<CoordinateSpacePlacer>();
+        }
+        if (coordinateSpacePlacer != null)
+        {
+            coordinateSpacePlacer.OnUnanchorStateChanged += SyncUnanchorToggle;
+        }
     }
 
     void OnDestroy()
@@ -281,8 +300,15 @@ public class HandleMenu : MonoBehaviour
         if (coneToggle != null) coneToggle.onValueChanged.RemoveAllListeners();
     if (doubleConeToggle != null) doubleConeToggle.onValueChanged.RemoveAllListeners();
         
-        // --- NEW REMOVE LISTENER ---
         if (penToggle != null) penToggle.onValueChanged.RemoveAllListeners();
+        if (unanchorToggle != null) unanchorToggle.onValueChanged.RemoveAllListeners();
+        if (autoExtendToggle != null) autoExtendToggle.onValueChanged.RemoveAllListeners();
+        
+        // Unsubscribe from events
+        if (coordinateSpacePlacer != null)
+        {
+            coordinateSpacePlacer.OnUnanchorStateChanged -= SyncUnanchorToggle;
+        }
     }
 
     void LateUpdate()
@@ -341,6 +367,45 @@ public class HandleMenu : MonoBehaviour
         {
             Destroy(currentPenInstance);
             currentPenInstance = null;
+        }
+    }
+    // ---------------------
+    
+    // --- UNANCHOR COORDINATE SPACE LOGIC ---
+    private void OnUnanchorToggleChanged(bool isOn)
+    {
+        if (coordinateSpacePlacer == null)
+        {
+            // Try to find it
+            coordinateSpacePlacer = FindFirstObjectByType<CoordinateSpacePlacer>();
+            if (coordinateSpacePlacer == null)
+            {
+                Debug.LogWarning("HandleMenu: CoordinateSpacePlacer not found in scene!");
+                return;
+            }
+        }
+        
+        coordinateSpacePlacer.ToggleUnanchor(isOn);
+    }
+    
+    private void OnAutoExtendToggleChanged(bool isOn)
+    {
+        ResolveCoordinateSpace();
+        
+        if (coordinateSpace != null)
+        {
+            coordinateSpace.SetAutoExtend(isOn);
+        }
+    }
+    
+    private void SyncUnanchorToggle(bool isUnanchored)
+    {
+        if (unanchorToggle != null)
+        {
+            // Temporarily remove listener to avoid triggering callback
+            unanchorToggle.onValueChanged.RemoveListener(OnUnanchorToggleChanged);
+            unanchorToggle.isOn = isUnanchored;
+            unanchorToggle.onValueChanged.AddListener(isOn => OnUnanchorToggleChanged(isOn));
         }
     }
     // ---------------------

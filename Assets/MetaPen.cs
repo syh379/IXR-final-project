@@ -23,6 +23,7 @@ public class MetaPen : MonoBehaviour
     private GameObject currentDrawing;
     private OVRInput.Controller activeController = OVRInput.Controller.None;
     private bool isDrawing = false;
+    private CoordinateSpaceController coordinateSpace;
 
     void Start()
     {
@@ -145,6 +146,12 @@ public class MetaPen : MonoBehaviour
         isDrawing = true;
         currentDrawing = new GameObject("DrawLine");
         
+        // Try to find coordinate space when starting to draw
+        if (coordinateSpace == null)
+        {
+            coordinateSpace = FindCoordinateSpace();
+        }
+        
         TrailRenderer trail = currentDrawing.AddComponent<TrailRenderer>();
         trail.time = Mathf.Infinity; 
         trail.minVertexDistance = 0.005f; 
@@ -162,12 +169,41 @@ public class MetaPen : MonoBehaviour
         isDrawing = false;
         if (currentDrawing != null)
         {
-            currentDrawing.transform.parent = null;
+            // Find and parent to coordinate space instead of leaving unparented
+            if (coordinateSpace == null)
+            {
+                coordinateSpace = FindCoordinateSpace();
+            }
+            
+            if (coordinateSpace != null)
+            {
+                currentDrawing.transform.SetParent(coordinateSpace.transform, true);
+            }
+            else
+            {
+                // Fallback: unparent if no coordinate space found
+                currentDrawing.transform.parent = null;
+            }
             
             // --- NEW: Add the finished line to our history stack ---
             drawingHistory.Push(currentDrawing);
             
             currentDrawing = null;
         }
+    }
+    
+    private CoordinateSpaceController FindCoordinateSpace()
+    {
+        // First try to find the placed coordinate space (not the preview)
+        var candidates = FindObjectsByType<CoordinateSpaceController>(FindObjectsSortMode.None);
+        foreach (var candidate in candidates)
+        {
+            if (candidate.gameObject.activeInHierarchy && 
+                candidate.gameObject.name != "CoordinateSpace_Preview")
+            {
+                return candidate;
+            }
+        }
+        return null;
     }
 }

@@ -7,6 +7,7 @@ public class CoordinateSpaceController : MonoBehaviour
     [SerializeField] private float maxAxisLength = 50f;
     [SerializeField] private float extensionThreshold = 10f; // Extend when user is within this distance from edge
     [SerializeField] private float extensionAmount = 20f; // How much to extend
+    [SerializeField] private bool autoExtendEnabled = false; // Toggleable auto-extension
     [SerializeField] private Color xAxisColor = Color.red;
     [SerializeField] private Color yAxisColor = Color.green;
     [SerializeField] private Color zAxisColor = Color.blue;
@@ -59,14 +60,16 @@ public class CoordinateSpaceController : MonoBehaviour
         
         // Create containers for ticks and grids
         ticksContainer = new GameObject("Ticks");
-        ticksContainer.transform.SetParent(transform);
+        ticksContainer.transform.SetParent(transform, false);
         ticksContainer.transform.localPosition = Vector3.zero;
         ticksContainer.transform.localRotation = Quaternion.identity;
+        ticksContainer.transform.localScale = Vector3.one;
         
         gridsContainer = new GameObject("Grids");
-        gridsContainer.transform.SetParent(transform);
+        gridsContainer.transform.SetParent(transform, false);
         gridsContainer.transform.localPosition = Vector3.zero;
         gridsContainer.transform.localRotation = Quaternion.identity;
+        gridsContainer.transform.localScale = Vector3.one;
         
         UpdateAxes();
         UpdateTicks();
@@ -81,8 +84,8 @@ public class CoordinateSpaceController : MonoBehaviour
             ToggleGrids();
         }
         
-        // Check if axes need to be extended
-        if (mainCamera != null)
+        // Check if axes need to be extended (only if auto-extend is enabled)
+        if (mainCamera != null && autoExtendEnabled)
         {
             CheckAndExtendAxes();
         }
@@ -99,20 +102,25 @@ public class CoordinateSpaceController : MonoBehaviour
     
     private void CheckAndExtendAxes()
     {
-        Vector3 localCameraPos = transform.InverseTransformPoint(mainCamera.transform.position);
+        // Account for transform scale when checking distance
+        Vector3 worldCameraPos = mainCamera.transform.position;
+        Vector3 localCameraPos = transform.InverseTransformPoint(worldCameraPos);
+        
+        // Effective axis length accounts for the transform scale
+        float effectiveLength = maxAxisLength;
         
         // Check each axis direction
-        if (Mathf.Abs(localCameraPos.x) > maxAxisLength - extensionThreshold)
+        if (Mathf.Abs(localCameraPos.x) > effectiveLength - extensionThreshold)
         {
             maxAxisLength += extensionAmount;
             needsUpdate = true;
         }
-        else if (Mathf.Abs(localCameraPos.y) > maxAxisLength - extensionThreshold)
+        else if (Mathf.Abs(localCameraPos.y) > effectiveLength - extensionThreshold)
         {
             maxAxisLength += extensionAmount;
             needsUpdate = true;
         }
-        else if (Mathf.Abs(localCameraPos.z) > maxAxisLength - extensionThreshold)
+        else if (Mathf.Abs(localCameraPos.z) > effectiveLength - extensionThreshold)
         {
             maxAxisLength += extensionAmount;
             needsUpdate = true;
@@ -190,8 +198,10 @@ public class CoordinateSpaceController : MonoBehaviour
             Vector3 tickPos = axisDir * pos;
             
             GameObject tickObj = new GameObject($"Tick_{axisDir}_{i}");
-            tickObj.transform.SetParent(ticksContainer.transform);
+            tickObj.transform.SetParent(ticksContainer.transform, false);
             tickObj.transform.localPosition = Vector3.zero;
+            tickObj.transform.localRotation = Quaternion.identity;
+            tickObj.transform.localScale = Vector3.one;
             
             LineRenderer lr = tickObj.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
@@ -243,8 +253,10 @@ public class CoordinateSpaceController : MonoBehaviour
             float pos = i * tickSpacing;
             
             GameObject lineObj = new GameObject($"Grid_{dir1}_{i}");
-            lineObj.transform.SetParent(gridsContainer.transform);
+            lineObj.transform.SetParent(gridsContainer.transform, false);
             lineObj.transform.localPosition = Vector3.zero;
+            lineObj.transform.localRotation = Quaternion.identity;
+            lineObj.transform.localScale = Vector3.one;
             
             LineRenderer lr = lineObj.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
@@ -267,8 +279,10 @@ public class CoordinateSpaceController : MonoBehaviour
             float pos = i * tickSpacing;
             
             GameObject lineObj = new GameObject($"Grid_{dir2}_{i}");
-            lineObj.transform.SetParent(gridsContainer.transform);
+            lineObj.transform.SetParent(gridsContainer.transform, false);
             lineObj.transform.localPosition = Vector3.zero;
+            lineObj.transform.localRotation = Quaternion.identity;
+            lineObj.transform.localScale = Vector3.one;
             
             LineRenderer lr = lineObj.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
@@ -290,5 +304,45 @@ public class CoordinateSpaceController : MonoBehaviour
     {
         showGrids = !showGrids;
         UpdateGrids();
+    }
+    
+    public void ForceUpdate()
+    {
+        UpdateAxes();
+        UpdateTicks();
+        UpdateGrids();
+    }
+    
+    // Public methods for external control
+    public float GetAxisLength()
+    {
+        return maxAxisLength;
+    }
+    
+    public void SetAxisLength(float length)
+    {
+        maxAxisLength = length;
+        needsUpdate = true;
+    }
+    
+    public float GetTickSpacing()
+    {
+        return tickSpacing;
+    }
+    
+    public void SetTickSpacing(float spacing)
+    {
+        tickSpacing = spacing;
+        needsUpdate = true;
+    }
+    
+    public void SetAutoExtend(bool enabled)
+    {
+        autoExtendEnabled = enabled;
+    }
+    
+    public bool GetAutoExtend()
+    {
+        return autoExtendEnabled;
     }
 }

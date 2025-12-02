@@ -10,22 +10,32 @@ public class CoordinateSpacePlacer : MonoBehaviour
     
     [Header("Input (OVR Input)")]
     [SerializeField] private OVRInput.Button placeButton = OVRInput.Button.One; // A button on right controller
-    [SerializeField] private OVRInput.Button unanchorButton = OVRInput.Button.PrimaryHandTrigger; // Grip button (try Three/Four if doesn't work)
     [SerializeField] private OVRInput.Controller controller = OVRInput.Controller.RTouch;
-    [SerializeField] private bool useIndexTriggerForUnanchor = false; // Alternative: use index trigger instead of grip
+    
+    [Header("Manipulation Settings")]
+    [SerializeField] private float minScale = 0.1f;
+    [SerializeField] private float maxScale = 10f;
+    [SerializeField] private float scaleSpeed = 1f;
+    [SerializeField] private float rotationSpeed = 60f;
     
     private GameObject currentPreview;
     private GameObject placedCoordinateSpace;
     private bool isAnchored = false;
     private bool isHoldingSpace = false;
     
+    private CoordinateSpaceController coordSpaceController;
+    private SimplePlayerController playerController;
+    
+    public delegate void UnanchorStateChanged(bool isUnanchored);
+    public event UnanchorStateChanged OnUnanchorStateChanged;
+    
     void Update()
     {
         // Update held space position (takes priority)
         if (isHoldingSpace && placedCoordinateSpace != null)
         {
-            Debug.Log($"Frame update: isHoldingSpace={isHoldingSpace}, calling UpdateHeldSpacePosition");
             UpdateHeldSpacePosition();
+            HandleManipulationInput();
         }
         // Update preview position if not placed yet
         else if (currentPreview != null && !isAnchored && placedCoordinateSpace == null)
@@ -33,55 +43,50 @@ public class CoordinateSpacePlacer : MonoBehaviour
             UpdatePreviewPosition();
         }
         
-        // Debug state
-        if (isHoldingSpace)
-        {
-            Debug.Log($"State: isHoldingSpace={isHoldingSpace}, isAnchored={isAnchored}, placedCoordinateSpace={placedCoordinateSpace != null}");
-        }
-        
-        // Handle placement/anchoring
+        // Handle placement/re-placement with A button
         if (OVRInput.GetDown(placeButton, controller))
         {
             if (!isAnchored)
             {
+                // Initial placement or re-placement after unanchoring
                 PlaceCoordinateSpace();
             }
         }
+    }
+    
+    private void HandleManipulationInput()
+    {
+        if (placedCoordinateSpace == null) return;
         
-        // Handle unanchoring - check both button and trigger input
-        bool unanchorPressed = false;
-        bool unanchorReleased = false;
-        
-        if (useIndexTriggerForUnanchor)
+        // Ensure player movement is disabled (redundant safety check)
+        if (playerController != null && playerController.enabled)
         {
-            // Use index trigger squeeze (0-1 value)
-            float triggerValue = OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, controller);
-            unanchorPressed = triggerValue > 0.8f && !isHoldingSpace;
-            unanchorReleased = triggerValue < 0.2f && isHoldingSpace;
-        }
-        else
-        {
-            // Use grip button
-            unanchorPressed = OVRInput.GetDown(unanchorButton, controller);
-            unanchorReleased = OVRInput.GetUp(unanchorButton, controller);
+            playerController.enabled = false;
+            Debug.LogWarning("[CoordinateSpacePlacer] Player controller was still enabled during manipulation - disabling it now");
         }
         
-        // Debug
-        if (unanchorPressed)
+        // Right joystick: Scale coordinate space transform (scales everything including shapes)
+        Vector2 rightStick = OVRInput.Get(OVRInput.Axis2D.PrimaryThumbstick, OVRInput.Controller.RTouch);
+        if (Mathf.Abs(rightStick.y) > 0.1f)
         {
-            Debug.Log($"Unanchor input detected! isAnchored: {isAnchored}, placedCoordinateSpace: {placedCoordinateSpace != null}");
+            float currentScale = placedCoordinateSpace.transform.localScale.x;
+            float newScale = currentScale + (rightStick.y * scaleSpeed * Time.deltaTime);
+            newScale = Mathf.Clamp(newScale, minScale, maxScale);
+            placedCoordinateSpace.transform.localScale = Vector3.one * newScale;
         }
         
-        // Handle unanchoring (hold to grab, release to anchor)
-        if (unanchorPressed && isAnchored)
+        // Left joystick: Rotate coordinate space
+        Vector2 leftStick = OVRInput.Get(OVRInput.Axis2D.PrimaryThumbstick, OVRInput.Controller.LTouch);
+        if (leftStick.magnitude > 0.1f)
         {
-            Debug.Log("Unanchoring coordinate space");
-            UnanchorCoordinateSpace();
-        }
-        else if (unanchorReleased && isHoldingSpace)
-        {
-            Debug.Log("Anchoring coordinate space");
-            AnchorCoordinateSpace();
+            // Rotate around Y axis (horizontal input)
+            float yaw = leftStick.x * rotationSpeed * Time.deltaTime;
+            
+            // Rotate around X axis (vertical input) 
+            float pitch = -leftStick.y * rotationSpeed * Time.deltaTime;
+            
+            placedCoordinateSpace.transform.Rotate(Vector3.up, yaw, Space.World);
+            placedCoordinateSpace.transform.Rotate(Vector3.right, pitch, Space.Self);
         }
     }
     
@@ -96,65 +101,98 @@ public class CoordinateSpacePlacer : MonoBehaviour
     
     private void UpdateHeldSpacePosition()
     {
-        if (controllerTransform == null)
-        {
-            Debug.LogWarning("UpdateHeldSpacePosition: controllerTransform is null!");
-            return;
-        }
-        if (placedCoordinateSpace == null)
-        {
-            Debug.LogWarning("UpdateHeldSpacePosition: placedCoordinateSpace is null!");
-            return;
-        }
+        if (controllerTransform == null || placedCoordinateSpace == null) return;
         
         Vector3 targetPos = controllerTransform.position + controllerTransform.forward * placementDistance;
         placedCoordinateSpace.transform.position = targetPos;
-        placedCoordinateSpace.transform.rotation = Quaternion.identity; // Keep axes aligned to world
-        Debug.Log($"Moving coordinate space to: {targetPos}");
+        // Don't reset rotation - allow user to manipulate it with joystick
     }
     
     private void PlaceCoordinateSpace()
     {
-        if (placedCoordinateSpace != null)
+        if (placedCoordinateSpace == null && currentPreview != null && coordinateSpacePrefab != null)
         {
-            // Already placed, do nothing
-            return;
-        }
-        
-        if (currentPreview != null && coordinateSpacePrefab != null)
-        {
-            // Instantiate the actual coordinate space at preview location
+            // Initial placement: Instantiate the coordinate space at preview location
             placedCoordinateSpace = Instantiate(coordinateSpacePrefab, 
                 currentPreview.transform.position, 
                 currentPreview.transform.rotation);
             
             // Hide preview after placement
             currentPreview.SetActive(false);
+            
+            // Get the controller component
+            coordSpaceController = placedCoordinateSpace.GetComponent<CoordinateSpaceController>();
+        }
+        
+        // Anchor the coordinate space (works for both initial placement and re-placement)
+        isAnchored = true;
+        isHoldingSpace = false;
+        
+        // Re-enable player movement
+        EnablePlayerMovement(true);
+        
+        // Notify listeners (for UI sync)
+        OnUnanchorStateChanged?.Invoke(false);
+    }
+    
+    // Called by HandleMenu toggle
+    public void ToggleUnanchor(bool unanchored)
+    {
+        if (placedCoordinateSpace == null) return;
+        
+        if (unanchored && isAnchored)
+        {
+            // Unanchor: coordinate space will follow controller
+            isAnchored = false;
+            isHoldingSpace = true;
+            
+            // Get controller reference if not already set
+            if (coordSpaceController == null)
+            {
+                coordSpaceController = placedCoordinateSpace.GetComponent<CoordinateSpaceController>();
+            }
+            
+            // Disable auto-extend when manually manipulating to avoid conflicts
+            if (coordSpaceController != null)
+            {
+                coordSpaceController.SetAutoExtend(false);
+            }
+            
+            // Disable player movement
+            EnablePlayerMovement(false);
+            
+            // Notify listeners (for UI sync if needed)
+            OnUnanchorStateChanged?.Invoke(true);
+        }
+        else if (!unanchored && isHoldingSpace)
+        {
+            // Re-anchor via toggle
             isAnchored = true;
+            isHoldingSpace = false;
+            
+            // Re-enable player movement
+            EnablePlayerMovement(true);
+            
+            // Notify listeners
+            OnUnanchorStateChanged?.Invoke(false);
         }
     }
     
-    private void UnanchorCoordinateSpace()
+    private void EnablePlayerMovement(bool enable)
     {
-        Debug.Log($"UnanchorCoordinateSpace called. placedCoordinateSpace: {placedCoordinateSpace != null}");
-        if (placedCoordinateSpace != null)
+        if (playerController == null)
         {
-            isAnchored = false;
-            isHoldingSpace = true;
-            Debug.Log($"Unanchored! isHoldingSpace: {isHoldingSpace}, isAnchored: {isAnchored}");
+            playerController = FindFirstObjectByType<SimplePlayerController>();
+        }
+        
+        if (playerController != null)
+        {
+            playerController.enabled = enable;
+            Debug.Log($"[CoordinateSpacePlacer] Player movement {(enable ? "ENABLED" : "DISABLED")}");
         }
         else
         {
-            Debug.LogWarning("Cannot unanchor - placedCoordinateSpace is null!");
-        }
-    }
-    
-    private void AnchorCoordinateSpace()
-    {
-        if (placedCoordinateSpace != null)
-        {
-            isAnchored = true;
-            isHoldingSpace = false;
+            Debug.LogWarning("[CoordinateSpacePlacer] SimplePlayerController not found - cannot disable movement!");
         }
     }
     
@@ -182,9 +220,18 @@ public class CoordinateSpacePlacer : MonoBehaviour
         {
             currentPreview = Instantiate(coordinateSpacePrefab);
             currentPreview.name = "CoordinateSpace_Preview";
-            
-            // Make preview slightly transparent (optional - needs material adjustment)
-            // For now, just keep it visible
+        }
+        
+        // Find player controller
+        playerController = FindFirstObjectByType<SimplePlayerController>();
+        
+        if (playerController != null)
+        {
+            Debug.Log($"[CoordinateSpacePlacer] Found SimplePlayerController on: {playerController.gameObject.name}");
+        }
+        else
+        {
+            Debug.LogWarning("[CoordinateSpacePlacer] SimplePlayerController not found in scene!");
         }
     }
 }
