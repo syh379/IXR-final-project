@@ -4,7 +4,9 @@ using System.Collections.Generic;
 public class CoordinateSpaceController : MonoBehaviour
 {
     [Header("Axis Settings")]
-    [SerializeField] private float maxAxisLength = 5f;
+    [SerializeField] private float maxAxisLength = 50f;
+    [SerializeField] private float extensionThreshold = 10f; // Extend when user is within this distance from edge
+    [SerializeField] private float extensionAmount = 20f; // How much to extend
     [SerializeField] private Color xAxisColor = Color.red;
     [SerializeField] private Color yAxisColor = Color.green;
     [SerializeField] private Color zAxisColor = Color.blue;
@@ -35,6 +37,8 @@ public class CoordinateSpaceController : MonoBehaviour
     private GameObject gridsContainer;
     private List<LineRenderer> tickLines = new List<LineRenderer>();
     private List<LineRenderer> gridLines = new List<LineRenderer>();
+    private Camera mainCamera;
+    private bool needsUpdate = false;
     
     void Start()
     {
@@ -49,6 +53,9 @@ public class CoordinateSpaceController : MonoBehaviour
                 else if (lr.gameObject.name == "z-axis") zAxisLine = lr;
             }
         }
+        
+        // Get main camera (VR camera)
+        mainCamera = Camera.main;
         
         // Create containers for ticks and grids
         ticksContainer = new GameObject("Ticks");
@@ -72,6 +79,43 @@ public class CoordinateSpaceController : MonoBehaviour
         if (OVRInput.GetDown(gridToggleButton, inputController))
         {
             ToggleGrids();
+        }
+        
+        // Check if axes need to be extended
+        if (mainCamera != null)
+        {
+            CheckAndExtendAxes();
+        }
+        
+        // Update if needed (to avoid updating every frame)
+        if (needsUpdate)
+        {
+            UpdateAxes();
+            UpdateTicks();
+            UpdateGrids();
+            needsUpdate = false;
+        }
+    }
+    
+    private void CheckAndExtendAxes()
+    {
+        Vector3 localCameraPos = transform.InverseTransformPoint(mainCamera.transform.position);
+        
+        // Check each axis direction
+        if (Mathf.Abs(localCameraPos.x) > maxAxisLength - extensionThreshold)
+        {
+            maxAxisLength += extensionAmount;
+            needsUpdate = true;
+        }
+        else if (Mathf.Abs(localCameraPos.y) > maxAxisLength - extensionThreshold)
+        {
+            maxAxisLength += extensionAmount;
+            needsUpdate = true;
+        }
+        else if (Mathf.Abs(localCameraPos.z) > maxAxisLength - extensionThreshold)
+        {
+            maxAxisLength += extensionAmount;
+            needsUpdate = true;
         }
     }
     
