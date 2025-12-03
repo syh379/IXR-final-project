@@ -23,6 +23,7 @@ public class MetaPen : MonoBehaviour
     private GameObject currentDrawing;
     private OVRInput.Controller activeController = OVRInput.Controller.None;
     private bool isDrawing = false;
+    private CoordinateSpaceController coordinateSpace;
 
     void Start()
     {
@@ -77,6 +78,22 @@ public class MetaPen : MonoBehaviour
 
     void Update()
     {
+        // Safety check: If pen tip is null, stop everything
+        if (penTip == null)
+        {
+            if (isDrawing)
+            {
+                // Clean up any active drawing
+                if (currentDrawing != null)
+                {
+                    Destroy(currentDrawing);
+                    currentDrawing = null;
+                }
+                isDrawing = false;
+            }
+            return;
+        }
+        
         // If not holding, stop
         if (activeController == OVRInput.Controller.None) return;
 
@@ -98,6 +115,22 @@ public class MetaPen : MonoBehaviour
         // 2. UNDO LOGIC (Other Hand)
         // ---------------------------------------------------------
         CheckUndoInput();
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up any active drawing when pen is destroyed
+        if (isDrawing && currentDrawing != null)
+        {
+            Destroy(currentDrawing);
+            currentDrawing = null;
+        }
+        
+        // Unsubscribe from events
+        if (grabbable != null)
+        {
+            grabbable.WhenPointerEventRaised -= HandlePointerEvent;
+        }
     }
 
     void CheckUndoInput()
@@ -142,8 +175,26 @@ public class MetaPen : MonoBehaviour
 
     void StartDraw()
     {
+        // Safety check
+        if (penTip == null)
+        {
+            Debug.LogWarning("[MetaPen] Cannot start drawing - penTip is null!");
+            return;
+        }
+        
         isDrawing = true;
         currentDrawing = new GameObject("DrawLine");
+        
+        // Try to find coordinate space when starting to draw
+        if (coordinateSpace == null)
+        {
+            coordinateSpace = FindCoordinateSpace();
+        }
+        
+        // Parent to pen tip first so trail follows the tip
+        currentDrawing.transform.SetParent(penTip, false);
+        currentDrawing.transform.localPosition = Vector3.zero;
+        currentDrawing.transform.localRotation = Quaternion.identity;
         
         TrailRenderer trail = currentDrawing.AddComponent<TrailRenderer>();
         trail.time = Mathf.Infinity; 
@@ -151,10 +202,6 @@ public class MetaPen : MonoBehaviour
         trail.startWidth = lineWidth;
         trail.endWidth = lineWidth;
         trail.material = lineMaterial;
-
-        currentDrawing.transform.position = penTip.position;
-        currentDrawing.transform.rotation = Quaternion.identity;
-        currentDrawing.transform.parent = penTip;
     }
 
     void EndDraw()
@@ -162,12 +209,100 @@ public class MetaPen : MonoBehaviour
         isDrawing = false;
         if (currentDrawing != null)
         {
-            currentDrawing.transform.parent = null;
+            // Get the TrailRenderer
+            TrailRenderer trail = currentDrawing.GetComponent<TrailRenderer>();
             
-            // --- NEW: Add the finished line to our history stack ---
+            // Find and parent to coordinate space FIRST
+            if (coordinateSpace == null)
+            {
+                coordinateSpace = FindCoordinateSpace();
+            }
+            
+            if (trail != null && coordinateSpace != null)
+            {
+                // Bake the trail into a LineRenderer with local positions
+                BakeTrailToLineRenderer(trail, coordinateSpace.transform);
+            }
+            else if (trail != null)
+            {
+                // No coordinate space found - bake without parenting
+                BakeTrailToLineRenderer(trail, null);
+            }
+            
+            // Parent to coordinate space
+            if (coordinateSpace != null)
+            {
+                currentDrawing.transform.SetParent(coordinateSpace.transform, false);
+                currentDrawing.transform.localPosition = Vector3.zero;
+                currentDrawing.transform.localRotation = Quaternion.identity;
+                currentDrawing.transform.localScale = Vector3.one;
+            }
+            else
+            {
+                // Fallback: leave at world position if no coordinate space found
+                currentDrawing.transform.parent = null;
+            }
+            
+            // Add the finished line to our history stack
             drawingHistory.Push(currentDrawing);
             
             currentDrawing = null;
         }
+    }
+    
+    private void BakeTrailToLineRenderer(TrailRenderer trail, Transform coordinateSpaceTransform)
+    {
+        // Get all positions from the trail (in world space)
+        Vector3[] worldPositions = new Vector3[trail.positionCount];
+        trail.GetPositions(worldPositions);
+        
+        if (worldPositions.Length < 2)
+        {
+            // Not enough points to make a line
+            return;
+        }
+        
+        // Convert to local space relative to coordinate space if available
+        Vector3[] localPositions = new Vector3[worldPositions.Length];
+        if (coordinateSpaceTransform != null)
+        {
+            for (int i = 0; i < worldPositions.Length; i++)
+            {
+                localPositions[i] = coordinateSpaceTransform.InverseTransformPoint(worldPositions[i]);
+            }
+        }
+        else
+        {
+            localPositions = worldPositions;
+        }
+        
+        // Remove the TrailRenderer
+        Destroy(trail);
+        
+        // Add a LineRenderer instead
+        LineRenderer lineRenderer = currentDrawing.AddComponent<LineRenderer>();
+        lineRenderer.useWorldSpace = false; // Use local space so it moves/rotates/scales with parent
+        lineRenderer.positionCount = localPositions.Length;
+        lineRenderer.SetPositions(localPositions);
+        lineRenderer.startWidth = lineWidth;
+        lineRenderer.endWidth = lineWidth;
+        lineRenderer.material = lineMaterial;
+        lineRenderer.numCornerVertices = 5;
+        lineRenderer.numCapVertices = 5;
+    }
+    
+    private CoordinateSpaceController FindCoordinateSpace()
+    {
+        // First try to find the placed coordinate space (not the preview)
+        var candidates = FindObjectsByType<CoordinateSpaceController>(FindObjectsSortMode.None);
+        foreach (var candidate in candidates)
+        {
+            if (candidate.gameObject.activeInHierarchy && 
+                candidate.gameObject.name != "CoordinateSpace_Preview")
+            {
+                return candidate;
+            }
+        }
+        return null;
     }
 }

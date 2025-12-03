@@ -1142,7 +1142,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6922400717518897287, guid: b48188c27b2db4fd18ac94412b31095d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2053285407}
+    - targetCorrespondingSourceObject: {fileID: 6922400717518897287, guid: b48188c27b2db4fd18ac94412b31095d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2053285408}
   m_SourcePrefab: {fileID: 100100000, guid: b48188c27b2db4fd18ac94412b31095d, type: 3}
 --- !u!114 &407117822 stripped
 MonoBehaviour:
@@ -2330,6 +2336,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: MetaPen
       objectReference: {fileID: 0}
+    - target: {fileID: 8438752590872127182, guid: e5d397317a5bb407594ec3bd7ee96f32, type: 3}
+      propertyPath: lineWidth
+      value: 0.015
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2888,6 +2898,51 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: c38536f0af05de541bcd30236afe6d72, type: 3}
+--- !u!1 &1824565571
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1824565573}
+  - component: {fileID: 1824565572}
+  m_Layer: 0
+  m_Name: ShapeManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1824565572
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1824565571}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c7ca69c7a88d4fe1b68081d1dbfeebf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShapeCreator
+  planeMaterial: {fileID: 2100000, guid: 1b9f94a4c1d244e0097f1875df3d831a, type: 2}
+--- !u!4 &1824565573
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1824565571}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -14.54973, y: 1.57, z: -5.88051}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1857060961
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3255,6 +3310,51 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: c5f868f465e50e943902cf18499f2d31, type: 3}
+--- !u!1 &2053285405 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6922400717518897287, guid: b48188c27b2db4fd18ac94412b31095d, type: 3}
+  m_PrefabInstance: {fileID: 407117821}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &2053285406 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1354084898454764015, guid: b48188c27b2db4fd18ac94412b31095d, type: 3}
+  m_PrefabInstance: {fileID: 407117821}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2053285407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2053285405}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46d012730d2e24d3bb0eb3f179dcb17e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRFreehandDrawer
+  controller: 2
+  minDistance: 0.05
+  triggerThreshold: 0.1
+  linePrefab: {fileID: 6565681369709291238, guid: 5b71f4e1434d04d9f894bee9b78d70f0, type: 3}
+  shapeCreator: {fileID: 1824565572}
+  drawingTip: {fileID: 2053285406}
+--- !u!114 &2053285408
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2053285405}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e47220f7728054ef9952948a9741c01c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OVRHandGrabber
+  controller: 2
+  grabRadius: 0.1
+  grabMask:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!4 &2076754806 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4117453449326408218, guid: c5f868f465e50e943902cf18499f2d31, type: 3}
@@ -3355,3 +3455,4 @@ SceneRoots:
   - {fileID: 407117821}
   - {fileID: 1702474431}
   - {fileID: 406286763}
+  - {fileID: 1824565573}
