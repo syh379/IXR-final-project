@@ -159,6 +159,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 19479118}
+  - component: {fileID: 19479120}
+  - component: {fileID: 19479119}
   m_Layer: 0
   m_Name: RightControllerAnchor
   m_TagString: Untagged
@@ -181,6 +183,41 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1751502057}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &19479119
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 19479117}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e47220f7728054ef9952948a9741c01c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OVRHandGrabber
+  controller: 2
+  grabRadius: 0.1
+  grabMask:
+    serializedVersion: 2
+    m_Bits: 64
+--- !u!114 &19479120
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 19479117}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46d012730d2e24d3bb0eb3f179dcb17e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRFreehandDrawer
+  controller: 2
+  minDistance: 0.05
+  triggerThreshold: 0.1
+  linePrefab: {fileID: 7064597881007619953, guid: 5b71f4e1434d04d9f894bee9b78d70f0, type: 3}
+  shapeCreator: {fileID: 1964602098}
+  drawingTip: {fileID: 19479118}
 --- !u!114 &85939679 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7114770129738175698, guid: d6733f35cecdc984c9d50925eb25939e, type: 3}
@@ -5342,6 +5379,51 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &1964602097
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1964602099}
+  - component: {fileID: 1964602098}
+  m_Layer: 0
+  m_Name: ShapeManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1964602098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1964602097}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c7ca69c7a88d4fe1b68081d1dbfeebf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShapeCreator
+  planeMaterial: {fileID: 2100000, guid: 640889debbebc41248f7b65f71787041, type: 2}
+--- !u!4 &1964602099
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1964602097}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -13.06588, y: -0.15, z: -2.04345}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!224 &2091619637 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 908747486747494908, guid: 41f0c6b657dffc944900710127356b17, type: 3}
@@ -7657,3 +7739,4 @@ SceneRoots:
   - {fileID: 3944112222516320956}
   - {fileID: 92104055}
   - {fileID: 1784262589}
+  - {fileID: 1964602099}
