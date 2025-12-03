@@ -5,6 +5,7 @@ using UnityEngine;
 /// Builds a simple double-cone (two cones sharing the apex at the origin).
 /// The apex is at y=0; the two cone bases are at y = ±(height/2).
 /// Height is tip-to-tip; radius is the base radius at each end.
+/// Now includes top and bottom base caps.
 /// </summary>
 public static class ProceduralDoubleCone
 {
@@ -16,10 +17,12 @@ public static class ProceduralDoubleCone
         int seg = Mathf.Max(3, segments);
         float halfH = height * 0.5f;
 
-        // vertices: top ring (y = +halfH), bottom ring (y = -halfH), then shared apex at origin
-        var verts = new List<Vector3>(seg * 2 + 1);
-        var uvs = new List<Vector2>(seg * 2 + 1);
-        var tris = new List<int>(seg * 6);
+        // vertices: top ring (y = +halfH), bottom ring (y = -halfH), shared apex at origin,
+        // plus top/bottom cap centers
+        var verts = new List<Vector3>(seg * 2 + 3);
+        var uvs = new List<Vector2>(seg * 2 + 3);
+        // side triangles (2*seg) + cap triangles (2*seg) => total 4*seg triangles => 12*seg indices
+        var tris = new List<int>(seg * 12);
 
         // top ring (0..seg-1)
         for (int i = 0; i < seg; i++)
@@ -42,7 +45,16 @@ public static class ProceduralDoubleCone
         verts.Add(Vector3.zero);
         uvs.Add(new Vector2(0.5f, 0.5f));
 
-        // top cone triangles: (apex, topRing[i], topRing[i+1])
+        // cap centers
+        int topCenterIndex = verts.Count;
+        verts.Add(new Vector3(0f, halfH, 0f));
+        uvs.Add(new Vector2(0.5f, 1f));
+
+        int bottomCenterIndex = verts.Count;
+        verts.Add(new Vector3(0f, -halfH, 0f));
+        uvs.Add(new Vector2(0.5f, 0f));
+
+        // top cone side triangles: (apex, topRing[i], topRing[i+1])
         for (int i = 0; i < seg; i++)
         {
             int n0 = apexIndex;
@@ -51,13 +63,31 @@ public static class ProceduralDoubleCone
             tris.Add(n0); tris.Add(n1); tris.Add(n2);
         }
 
-        // bottom cone triangles: (apex, bottomRing[i+1], bottomRing[i])
+        // bottom cone side triangles: (apex, bottomRing[i+1], bottomRing[i])
         for (int i = 0; i < seg; i++)
         {
             int n0 = apexIndex;
             int n1 = seg + ((i + 1) % seg);
             int n2 = seg + i;
             tris.Add(n0); tris.Add(n1); tris.Add(n2);
+        }
+
+        // top cap triangles (wound to face upward)
+        for (int i = 0; i < seg; i++)
+        {
+            int i0 = i;
+            int i1 = (i + 1) % seg;
+            // Use (center, next, current) so the cap faces outward (upwards)
+            tris.Add(topCenterIndex); tris.Add(i1); tris.Add(i0);
+        }
+
+        // bottom cap triangles (wound to face downward)
+        for (int i = 0; i < seg; i++)
+        {
+            int j0 = seg + i;
+            int j1 = seg + ((i + 1) % seg);
+            // Use (center, current, next) so the cap faces outward (downwards)
+            tris.Add(bottomCenterIndex); tris.Add(j0); tris.Add(j1);
         }
 
         mesh.SetVertices(verts);
