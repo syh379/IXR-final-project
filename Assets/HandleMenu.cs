@@ -3,13 +3,14 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 using Oculus.Interaction;
+using Oculus.Interaction.Surfaces; // Added for ColliderSurface
 
 public class HandleMenu : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private CoordinateSpaceController coordinateSpace;
     [SerializeField] private CoordinateSpacePlacer coordinateSpacePlacer; // For unanchoring control 
-    [SerializeField] private GameObject isdkRayGrabInteractionTemplate; // Template in-scene to clone for each spawned shape
+    [SerializeField] private GameObject isdkRayGrabInteractionTemplate; // Prefab in-scene to clone for each spawned shape
 
     [Header("Shape Selection (ToggleGroup)")]
     [SerializeField] private ToggleGroup shapeToggleGroup;
@@ -28,14 +29,12 @@ public class HandleMenu : MonoBehaviour
     [SerializeField] private Vector3 shapeScale = Vector3.one * 1f;
     [SerializeField] private Material shapeMaterial;
 
-    // --- NEW PEN SETTINGS ---
     [Header("Pen Settings")]
-    [SerializeField] private Toggle penToggle;      // Assign your UI Toggle here
-    [SerializeField] private GameObject penPrefab;  // Assign your Pen Prefab here
-    [SerializeField] private float penSpawnDistance = 0.5f; // How far in front of user
+    [SerializeField] private Toggle penToggle;
+    [SerializeField] private GameObject penPrefab;
+    [SerializeField] private float penSpawnDistance = 0.5f;
     
     private GameObject currentPenInstance;
-    // ------------------------
 
     private GameObject originShape;
     private Vector3 currentShapeOffset = Vector3.zero;
@@ -43,7 +42,7 @@ public class HandleMenu : MonoBehaviour
 
     void Awake()
     {
-        ResolveCoordinateSpace(); 
+        ResolveCoordinateSpace();
 
         // Register listeners
         if (cubeToggle != null) cubeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cubeToggle, isOn));
@@ -51,7 +50,7 @@ public class HandleMenu : MonoBehaviour
         if (cylinderToggle != null) cylinderToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cylinderToggle, isOn));
         if (deleteToggle != null) deleteToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(deleteToggle, isOn));
         if (coneToggle != null) coneToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(coneToggle, isOn));
-    if (doubleConeToggle != null) doubleConeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(doubleConeToggle, isOn));
+        if (doubleConeToggle != null) doubleConeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(doubleConeToggle, isOn));
         
         // Pen toggle
         if (penToggle != null) penToggle.onValueChanged.AddListener(isOn => OnPenToggleChanged(isOn));
@@ -78,7 +77,7 @@ public class HandleMenu : MonoBehaviour
         if (cylinderToggle != null) cylinderToggle.onValueChanged.RemoveAllListeners();
         if (deleteToggle != null) deleteToggle.onValueChanged.RemoveAllListeners();
         if (coneToggle != null) coneToggle.onValueChanged.RemoveAllListeners();
-    if (doubleConeToggle != null) doubleConeToggle.onValueChanged.RemoveAllListeners();
+        if (doubleConeToggle != null) doubleConeToggle.onValueChanged.RemoveAllListeners();
         
         if (penToggle != null) penToggle.onValueChanged.RemoveAllListeners();
         if (unanchorToggle != null) unanchorToggle.onValueChanged.RemoveAllListeners();
@@ -350,16 +349,45 @@ public class HandleMenu : MonoBehaviour
     }
 
     /// <summary>
-    /// Finds a scene GameObject named "ISDK_RayGrabInteraction", clones it as a child
-    /// of the spawned shape, and reflectively assigns any Grabbable-typed fields or
-    /// properties on components of the cloned interaction object to the provided
-    /// grabbable instance.
+    /// Clone template under shape and wire Grabbable, ColliderSurface, Collider and PointableElement dependencies.
+    /// Fixes "collider surface" and "pointable element" unassigned warnings.
+    /// Also assigns Ray Interaction script's pointableElement to the shape's PointableElement.
     /// </summary>
     private void AttachAndWireISDKRayGrabInteraction(GameObject parentShape, Grabbable grabbable)
     {
         if (parentShape == null || grabbable == null) return;
 
-        // Prefer serialized template; fall back to searching the scene by name
+        // Ensure the shape has a Collider
+        var shapeCollider = parentShape.GetComponent<Collider>();
+        if (shapeCollider == null)
+        {
+            var mf = parentShape.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null)
+            {
+                var meshCol = parentShape.AddComponent<MeshCollider>();
+                meshCol.sharedMesh = mf.sharedMesh;
+                meshCol.convex = true;
+                shapeCollider = meshCol;
+            }
+            else
+            {
+                shapeCollider = parentShape.AddComponent<BoxCollider>();
+            }
+        }
+
+        // Ensure a PointableElement exists on the shape
+        var pointable = parentShape.GetComponent<PointableElement>();
+        if (pointable == null) pointable = parentShape.AddComponent<PointableElement>();
+
+        // Ensure a ColliderSurface exists (attach to the shape so it references its collider)
+        var surface = parentShape.GetComponent<ColliderSurface>();
+        if (surface == null) surface = parentShape.AddComponent<ColliderSurface>();
+        // ColliderSurface has a private serialized field; assign via reflection for runtime wiring
+        var surfaceType = typeof(ColliderSurface);
+        var colliderField = surfaceType.GetField("_collider", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (colliderField != null) colliderField.SetValue(surface, shapeCollider);
+
+        // Get template to clone
         var template = isdkRayGrabInteractionTemplate != null ? isdkRayGrabInteractionTemplate : GameObject.Find("ISDK_RayGrabInteraction");
         if (template == null)
         {
@@ -370,33 +398,75 @@ public class HandleMenu : MonoBehaviour
         var clone = Instantiate(template, parentShape.transform, false);
         clone.transform.localPosition = Vector3.zero;
         clone.transform.localRotation = Quaternion.identity;
-        clone.name = "ISDK_RayGrabInteraction"; // normalize name under parent
+        clone.name = "ISDK_RayGrabInteraction";
 
-        // Walk components on the cloned template and assign Grabbable references
+        var cloneRayInteractable = clone.GetComponent<RayInteractable>();
+        cloneRayInteractable.InjectOptionalPointableElement(grabbable);
+
+        // Walk components on the cloned template and assign references
         var comps = clone.GetComponents<MonoBehaviour>();
         foreach (var comp in comps)
         {
             if (comp == null) continue;
             var t = comp.GetType();
 
-            // Fields
+            // Assign fields
             var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             foreach (var f in fields)
             {
                 if (f.FieldType == typeof(Grabbable))
                 {
                     f.SetValue(comp, grabbable);
+                    continue;
+                }
+                if (f.FieldType == typeof(ColliderSurface))
+                {
+                    f.SetValue(comp, surface);
+                    continue;
+                }
+                if (f.FieldType == typeof(Collider))
+                {
+                    f.SetValue(comp, shapeCollider);
+                    continue;
+                }
+                if (f.FieldType == typeof(PointableElement))
+                {
+                    f.SetValue(comp, pointable);
+                    continue;
                 }
             }
 
-            // Properties
+            // Assign properties (when writable)
             var props = t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             foreach (var p in props)
             {
                 if (!p.CanWrite) continue;
+
                 if (p.PropertyType == typeof(Grabbable))
                 {
                     try { p.SetValue(comp, grabbable, null); } catch { }
+                    continue;
+                }
+                if (p.PropertyType == typeof(ColliderSurface))
+                {
+                    try { p.SetValue(comp, surface, null); } catch { }
+                    continue;
+                }
+                if (p.PropertyType == typeof(Collider))
+                {
+                    try { p.SetValue(comp, shapeCollider, null); } catch { }
+                    continue;
+                }
+                if (p.PropertyType == typeof(PointableElement))
+                {
+                    try { p.SetValue(comp, pointable, null); } catch { }
+                    continue;
+                }
+
+                // If a script exposes a property named "pointableElement" regardless of type checks, attempt assignment
+                if (p.Name.ToLower().Contains("pointableelement") && p.CanWrite)
+                {
+                    try { p.SetValue(comp, pointable, null); } catch { }
                 }
             }
         }
@@ -410,13 +480,24 @@ public class HandleMenu : MonoBehaviour
             var rb = shape.GetComponent<Rigidbody>();
             if (rb == null) rb = shape.AddComponent<Rigidbody>();
             rb.useGravity = false;
-            rb.isKinematic = false;
+            rb.isKinematic = true; // kinematic for ray/hand interactions
 
             var grabbable = shape.GetComponent<Grabbable>();
             if (grabbable == null) grabbable = shape.AddComponent<Grabbable>();
 
+            // Assign the shape's Rigidbody to the Grabbable via reflection (handles private serialized field)
+            grabbable.InjectOptionalRigidbody(rb);
+
+            // Ensure PointableElement exists on the same shape (used by ray interaction)
+            var pointable = shape.GetComponent<PointableElement>();
+            if (pointable == null) pointable = shape.AddComponent<PointableElement>();
+
             if (shape.GetComponent<GrabInteractable>() == null)
                 shape.AddComponent<GrabInteractable>();
+
+            var grabInteractable = shape.GetComponent<GrabInteractable>();
+            grabInteractable.InjectRigidbody(rb);
+
             if (shape.GetComponent<GrabFreeTransformer>() == null)
                 shape.AddComponent<GrabFreeTransformer>();
 
