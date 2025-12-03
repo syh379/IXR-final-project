@@ -67,7 +67,7 @@ public class ShapeCreator : MonoBehaviour
         // 2. Add Rigidbody (Allows physics interaction)
         Rigidbody rb = newPlane.AddComponent<Rigidbody>();
         rb.useGravity = false; // Set to true if you want it to fall to the floor
-        rb.isKinematic = false; 
+        rb.isKinematic = true; // not affected by physics forces
         
         // 3. Set Layer (Optional but recommended)
         newPlane.layer = LayerMask.NameToLayer("Grabbable");

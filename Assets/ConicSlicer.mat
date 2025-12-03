@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: ScanMaterial
-  m_Shader: {fileID: -6465566751694194690, guid: 9173c2bcaadf64400a7de3d9f8b1485e, type: 3}
+  m_Name: ConicSlicer
+  m_Shader: {fileID: -6465566751694194690, guid: bdeecccbd32584551b9a9f36707e8fd7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -38,14 +38,19 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _FillProximity: 0.5
+    - _GlassOpacity: 0.15
+    - _LineThickness: 0.01
     - _QueueControl: 0
     - _QueueOffset: 0
     - _XRMotionVectorsPass: 1
     m_Colors:
-    - _GlowColor: {r: 1, g: 0.8408109, b: 0, a: 1}
+    - _FillColor: {r: 0.3221618, g: 0.9528302, b: 0.2382075, a: 1}
+    - _GlassColor: {r: 0.3524831, g: 0.694436, b: 0.8396226, a: 1}
+    - _LineColor: {r: 1, g: 0.4700873, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &8796634128944971576
+--- !u!114 &3689541700763310992
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}

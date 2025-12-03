@@ -26,10 +26,13 @@ public class VRFreehandDrawer : MonoBehaviour
     {
         // 1. GET INPUT FROM OCULUS SDK
         // We get the float value (0.0 to 1.0) just like in your other script
-        float triggerValue = OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, controller);
+        // get right controller secondary button press
+        // float triggerValue = OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, controller);
+        // Returns 1.0 if pressed, 0.0 if not
+        bool triggerPressed = OVRInput.Get(OVRInput.Button.Two, controller);
 
         // Convert the float to a simple "Is Pressed?" boolean
-        bool triggerPressed = triggerValue > triggerThreshold;
+        // bool triggerPressed = triggerValue > triggerThreshold;
 
         // Also keep Spacebar for keyboard testing if needed
         if (Input.GetKey(KeyCode.Space)) triggerPressed = true;

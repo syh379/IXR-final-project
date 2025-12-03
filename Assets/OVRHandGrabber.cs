@@ -72,13 +72,8 @@ public class OVRHandGrabber : MonoBehaviour
             // UN-PARENT: Restore it to the world
             currentObject.transform.SetParent(null, true);
 
-            // Re-enable physics so it stays there (or falls if you want gravity)
             Rigidbody rb = currentObject.GetComponent<Rigidbody>();
-            if (rb)
-            {
-                rb.isKinematic = false; 
-                // Optional: Add "Throw" velocity here if you want to toss it
-            }
+            if (rb) rb.isKinematic = true;
 
             currentObject = null;
         }
