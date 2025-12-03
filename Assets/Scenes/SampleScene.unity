@@ -275,6 +275,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   coordinateSpace: {fileID: 3180217895524773340, guid: 24313fca8c6f031489d3c85594cce3af, type: 3}
   coordinateSpacePlacer: {fileID: 0}
+  isdkRayGrabInteractionTemplate: {fileID: 4074751442792592471, guid: 86d7ba38b3a69474cb3f4fc3b7b23dc9, type: 3}
   shapeToggleGroup: {fileID: 85939679}
   cubeToggle: {fileID: 180929251}
   sphereToggle: {fileID: 451183915}
