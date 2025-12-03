@@ -196,7 +196,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OVRHandGrabber
   controller: 2
-  grabRadius: 0.1
+  grabRadius: 0.03
   grabMask:
     serializedVersion: 2
     m_Bits: 64
