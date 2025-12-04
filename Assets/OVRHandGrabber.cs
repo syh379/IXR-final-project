@@ -3,46 +3,45 @@ using UnityEngine;
 public class OVRHandGrabber : MonoBehaviour
 {
     [Header("Settings")]
-    // Select LTouch or RTouch in the Inspector
-    public OVRInput.Controller controller = OVRInput.Controller.RTouch;
-    
-    // The button to delete objects (Button.Two is 'B' on Right, 'Y' on Left)
-    public OVRInput.Button deleteButton = OVRInput.Button.Two; 
-    
+    // Set this to 'L Touch' in the Inspector for your Left Hand
+    public OVRInput.Controller grabbingHand = OVRInput.Controller.LTouch;
     public float grabRadius = 0.1f;
-    public LayerMask grabMask; // Set this to "Everything" or your specific "Grabbable" layer
+    public LayerMask grabMask; 
 
     // Internal State
-    private GameObject currentObject; // The object we are currently holding
-    private GameObject hoveredObject; // The object we are touching but not holding
+    private GameObject currentObject; 
+    private GameObject hoveredObject; 
     private bool isGrabbing = false;
+
+    // Hardcoded: Right Hand 'B' button is Button.Two on RTouch
+    private OVRInput.Controller deleteHand = OVRInput.Controller.RTouch;
+    private OVRInput.Button deleteButton = OVRInput.Button.Two; 
 
     void Update()
     {
-        // 1. GET INPUTS
-        // Grip Trigger for Grabbing (Returns float 0 to 1)
-        float gripValue = OVRInput.Get(OVRInput.Axis1D.PrimaryHandTrigger, controller);
+        // 1. GET GRAB INPUT (From Left Hand)
+        float gripValue = OVRInput.Get(OVRInput.Axis1D.PrimaryHandTrigger, grabbingHand);
         bool gripPressed = gripValue > 0.5f;
 
-        // Secondary Button for Deleting (Returns true/false)
-        bool deletePressed = OVRInput.GetDown(deleteButton, controller);
+        // 2. GET DELETE INPUT (From Right Hand - Button B)
+        // We check RTouch specifically, regardless of which hand this script is on
+        bool deletePressed = OVRInput.GetDown(deleteButton, deleteHand);
 
-        // 2. CHECK DELETE
+        // 3. CHECK DELETE
         if (deletePressed)
         {
             TryDeleteObject();
         }
 
-        // 3. CHECK GRAB
+        // 4. CHECK GRAB
         if (gripPressed && !isGrabbing)
         {
-            // If we are hovering over something, pick it up
             if (hoveredObject != null)
             {
                 GrabObject(hoveredObject);
             }
         }
-        // 4. CHECK RELEASE
+        // 5. CHECK RELEASE
         else if (!gripPressed && isGrabbing)
         {
             ReleaseObject();
@@ -57,7 +56,6 @@ public class OVRHandGrabber : MonoBehaviour
             Collider[] hits = Physics.OverlapSphere(transform.position, grabRadius, grabMask);
             if (hits.Length > 0)
             {
-                // Find the closest object (optional optimization, otherwise just takes first)
                 hoveredObject = hits[0].gameObject;
             }
             else
@@ -71,16 +69,14 @@ public class OVRHandGrabber : MonoBehaviour
     {
         isGrabbing = true;
         currentObject = obj;
-        hoveredObject = null; // Clear hover so we don't try to grab it again
+        hoveredObject = null; 
 
-        // 1. Disable Physics while holding (so it doesn't fight your hand)
         Rigidbody rb = currentObject.GetComponent<Rigidbody>();
         if (rb) 
         {
             rb.isKinematic = true; 
         }
 
-        // 2. Parent it to the hand (Moves 1:1 with you)
         currentObject.transform.SetParent(this.transform, true); 
     }
 
@@ -88,16 +84,13 @@ public class OVRHandGrabber : MonoBehaviour
     {
         if (currentObject != null)
         {
-            // 1. Un-parent (Drop it back into the world)
             currentObject.transform.SetParent(null, true);
 
-            // 2. PHYSICS DECISION:
-            // If you want it to float (Ghost Mode) for slicing: Keep isKinematic = true
-            // If you want it to fall to the floor: Set isKinematic = false
             Rigidbody rb = currentObject.GetComponent<Rigidbody>();
             if (rb)
             {
-                rb.isKinematic = true; // Kept TRUE so planes don't fly away inside cones
+                // Keeping IsKinematic = true per your previous request (Ghost mode)
+                rb.isKinematic = true; 
             }
 
             currentObject = null;
@@ -107,22 +100,15 @@ public class OVRHandGrabber : MonoBehaviour
 
     void TryDeleteObject()
     {
-        // Case A: Delete the object currently in your hand
+        // ONLY delete if we are currently holding the object
         if (isGrabbing && currentObject != null)
         {
             Destroy(currentObject);
             currentObject = null;
-            isGrabbing = false;
-        }
-        // Case B: Delete the object you are touching (hovering)
-        else if (!isGrabbing && hoveredObject != null)
-        {
-            Destroy(hoveredObject);
-            hoveredObject = null;
+            isGrabbing = false; // Reset state immediately
         }
     }
 
-    // Visualize the grab range in the Scene View
     void OnDrawGizmos()
     {
         Gizmos.color = Color.yellow;
