@@ -364,8 +364,8 @@ MonoBehaviour:
   showGrids: 0
   gridColor: {r: 1, g: 1, b: 1, a: 0.3}
   gridWidth: 0.005
-  gridToggleButton: 0
-  inputController: 2
+  gridToggleButton: 2
+  inputController: 1
   xAxisLine: {fileID: 9169805335018199739}
   yAxisLine: {fileID: 5413711984137789336}
   zAxisLine: {fileID: 1911236641180587309}
