@@ -26,7 +26,7 @@ public class CoordinateSpaceController : MonoBehaviour
     
     [Header("Input Settings")]
     [SerializeField] private OVRInput.Button gridToggleButton = OVRInput.Button.Two; // B button
-    [SerializeField] private OVRInput.Controller inputController = OVRInput.Controller.RTouch;
+    [SerializeField] private OVRInput.Controller inputController = OVRInput.Controller.LTouch;
     
     [Header("References")]
     [SerializeField] private LineRenderer xAxisLine;
