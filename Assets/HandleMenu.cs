@@ -1,9 +1,11 @@
+using System;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 using Oculus.Interaction;
-using Oculus.Interaction.Surfaces; // Added for ColliderSurface
+using Oculus.Interaction.Surfaces;
+using Text = TMPro.TMP_Text;
 
 public class HandleMenu : MonoBehaviour
 {
@@ -34,15 +36,124 @@ public class HandleMenu : MonoBehaviour
     [SerializeField] private GameObject penPrefab;
     [SerializeField] private float penSpawnDistance = 0.5f;
 
+    // --- Instructions UI ---
+    [Header("Instructions UI")]
+    [SerializeField] private Text instructionTitleText;      // UI Text for title
+    [SerializeField] private Text instructionObjectiveText;  // UI Text for objective
+    [SerializeField] private Text instructionBodyText;       // UI Text for instructions (numbered list)
+    [SerializeField] private Button nextStepButton;          // Next step
+    [SerializeField] private Button prevStepButton;          // Previous step
+    [SerializeField] private TextAsset instructionsJson;     // Optional JSON asset to populate steps
+
     private GameObject currentPenInstance;
 
     private GameObject originShape;
     private Vector3 currentShapeOffset = Vector3.zero;
-    private bool _suppressCallbacks;
+
+
+    // --- Instruction data/state ---
+    [Serializable]
+    private class Step
+    {
+        public string title;
+        public string objective;
+        public string[] instructions;
+    }
+    [Serializable]
+    private class StepsWrapper
+    {
+        public Step[] steps;
+    }
+    [SerializeField]
+    private Step[] steps =
+    {
+        new Step
+        {
+            title = "Step 1 - The Setup",
+            objective = "Visualize the 3D workspace.",
+            instructions = new[]
+            {
+                "Trace the two cones inserted into the space",
+                "Draw a vertical line through the middle",
+                "Draw a cutting plane and grab it",
+            }
+        },
+        new Step
+        {
+            title = "Step 2 - The Circle",
+            objective = "Generate a perfectly round, closed curve.",
+            instructions = new[]
+            {
+                "Position the cutting plane perfectly horizontal.",
+                "Ensure the plane is perpendicular (90°) to the vertical Axis.",
+                "Slice through one cone to reveal a perfect Circle."
+            }
+        },
+        new Step
+        {
+            title = "Step 3 - The Ellipse",
+            objective = "Generate an oval-shaped, closed curve.",
+            instructions = new[]
+            {
+                "Start with a horizontal plane.",
+                "Tilt the plane slightly so it is diagonal.",
+                "Slice through one cone only, ensuring the cut goes in one side and out the other."
+            }
+        },
+        new Step
+        {
+            title = "Step 4 - The Parabola",
+            objective = "Generate an open U-shaped curve.",
+            instructions = new[]
+            {
+                "Tilt the plane further until its angle matches the slope of the cone's side.",
+                "Ensure the plane is parallel to the Generator (the slant edge).",
+                "Slice the cone; the curve will remain open because the plane and cone edge never intersect."
+            }
+        },
+        new Step
+        {
+            title = "Step 5 - The Hyperbola",
+            objective = "Generate two separate, mirrored curves.",
+            instructions = new[]
+            {
+                "Tilt the plane until it is vertical (steepest angle).",
+                "Slice straight down parallel to the vertical Axis.",
+                "Intersect both the top cone and the bottom cone to create two separate curves."
+            }
+        }
+    };
+
+    private int _stepIndex = 0;
 
     void Awake()
     {
         ResolveCoordinateSpace();
+
+        // Load instructions from JSON if provided
+        if (instructionsJson != null)
+        {
+            try
+            {
+                string json = instructionsJson.text;
+                string trimmed = json.TrimStart();
+                if (trimmed.StartsWith("["))
+                {
+                    json = "{\"steps\":" + json + "}";
+                    var wrapper = JsonUtility.FromJson<StepsWrapper>(json);
+                    steps = wrapper != null ? wrapper.steps : steps;
+                }
+                else
+                {
+                    var wrapper = JsonUtility.FromJson<StepsWrapper>(json);
+                    steps = wrapper != null ? wrapper.steps : steps;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"HandleMenu: Failed to parse instructions JSON: {ex.Message}");
+            }
+        }
 
         // Register listeners
         if (cubeToggle != null) cubeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cubeToggle, isOn));
@@ -68,6 +179,13 @@ public class HandleMenu : MonoBehaviour
         {
             coordinateSpacePlacer.OnUnanchorStateChanged += SyncUnanchorToggle;
         }
+
+        // Step navigation buttons
+        if (nextStepButton != null) nextStepButton.onClick.AddListener(OnNextStepClicked);
+        if (prevStepButton != null) prevStepButton.onClick.AddListener(OnPrevStepClicked);
+
+        // Initialize instruction UI
+        UpdateInstructionUI();
     }
 
     void OnDestroy()
@@ -83,7 +201,9 @@ public class HandleMenu : MonoBehaviour
         if (unanchorToggle != null) unanchorToggle.onValueChanged.RemoveAllListeners();
         if (autoExtendToggle != null) autoExtendToggle.onValueChanged.RemoveAllListeners();
 
-        // Unsubscribe from events
+        if (nextStepButton != null) nextStepButton.onClick.RemoveAllListeners();
+        if (prevStepButton != null) prevStepButton.onClick.RemoveAllListeners();
+
         if (coordinateSpacePlacer != null)
         {
             coordinateSpacePlacer.OnUnanchorStateChanged -= SyncUnanchorToggle;
@@ -100,6 +220,69 @@ public class HandleMenu : MonoBehaviour
             originShape.transform.localPosition = currentShapeOffset;
             originShape.transform.localRotation = Quaternion.identity;
         }
+    }
+
+    // --- Step navigation logic ---
+    private void OnNextStepClicked()
+    {
+        SetStepIndex(_stepIndex + 1);
+    }
+
+    private void OnPrevStepClicked()
+    {
+        SetStepIndex(_stepIndex - 1);
+    }
+
+    private void SetStepIndex(int newIndex)
+    {
+        int maxStep = (steps != null && steps.Length > 0) ? steps.Length - 1 : 0;
+        int clamped = Mathf.Clamp(newIndex, 0, maxStep);
+        if (clamped != _stepIndex)
+        {
+            _stepIndex = clamped;
+            UpdateInstructionUI();
+        }
+        else
+        {
+            UpdateInstructionUI();
+        }
+    }
+
+    private void UpdateInstructionUI()
+    {
+        bool hasSteps = steps != null && steps.Length > 0;
+        Step current = hasSteps ? steps[_stepIndex] : null;
+
+        if (instructionTitleText != null)
+        {
+            instructionTitleText.text = hasSteps && !string.IsNullOrEmpty(current.title) ? current.title : string.Empty;
+        }
+        if (instructionObjectiveText != null)
+        {
+            instructionObjectiveText.text = hasSteps && !string.IsNullOrEmpty(current.objective) ? current.objective : string.Empty;
+        }
+        if (instructionBodyText != null)
+        {
+            if (hasSteps && current.instructions != null && current.instructions.Length > 0)
+            {
+                // Build numbered list
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                for (int i = 0; i < current.instructions.Length; i++)
+                {
+                    sb.Append(i + 1).Append(". ").Append(current.instructions[i]);
+                    if (i < current.instructions.Length - 1) sb.Append('\n');
+                }
+                instructionBodyText.text = sb.ToString();
+            }
+            else
+            {
+                instructionBodyText.text = string.Empty;
+            }
+        }
+
+        // Enable/disable step buttons appropriately
+        if (prevStepButton != null) prevStepButton.interactable = hasSteps && _stepIndex > 0;
+        if (nextStepButton != null) nextStepButton.interactable = hasSteps && _stepIndex < (steps.Length - 1);
     }
 
     // --- NEW PEN LOGIC ---
@@ -191,7 +374,7 @@ public class HandleMenu : MonoBehaviour
 
     private void OnShapeToggleChanged(Toggle source, bool isOn)
     {
-        if (_suppressCallbacks || !isOn) return;
+        if (!isOn) return;
 
         if (deleteToggle != null && source == deleteToggle)
         {
@@ -535,7 +718,7 @@ public class HandleMenu : MonoBehaviour
         }
 
 #if UNITY_2023_1_OR_NEWER
-        var candidates = Object.FindObjectsByType<CoordinateSpaceController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        var candidates = UnityEngine.Object.FindObjectsByType<CoordinateSpaceController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 #else
         var candidates = Object.FindObjectsOfType<CoordinateSpaceController>();
 #endif
