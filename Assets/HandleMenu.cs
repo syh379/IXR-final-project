@@ -43,13 +43,15 @@ public class HandleMenu : MonoBehaviour
     [SerializeField] private Text instructionBodyText;       // UI Text for instructions (numbered list)
     [SerializeField] private Button nextStepButton;          // Next step
     [SerializeField] private Button prevStepButton;          // Previous step
-    [SerializeField] private TextAsset instructionsJson;     // Optional JSON asset to populate steps
+
+    [Header("Tutorial")]
+    [SerializeField] private Toggle tutorialToggle;          // Toggle in the list that shows/hides the tutorial
+    [SerializeField] private GameObject tutorialBoard;       // Board GameObject that contains the tutorial UI
 
     private GameObject currentPenInstance;
 
     private GameObject originShape;
     private Vector3 currentShapeOffset = Vector3.zero;
-
 
     // --- Instruction data/state ---
     [Serializable]
@@ -64,7 +66,7 @@ public class HandleMenu : MonoBehaviour
     {
         public Step[] steps;
     }
-    [SerializeField]
+    
     private Step[] steps =
     {
         new Step
@@ -129,31 +131,7 @@ public class HandleMenu : MonoBehaviour
     void Awake()
     {
         ResolveCoordinateSpace();
-
-        // Load instructions from JSON if provided
-        if (instructionsJson != null)
-        {
-            try
-            {
-                string json = instructionsJson.text;
-                string trimmed = json.TrimStart();
-                if (trimmed.StartsWith("["))
-                {
-                    json = "{\"steps\":" + json + "}";
-                    var wrapper = JsonUtility.FromJson<StepsWrapper>(json);
-                    steps = wrapper != null ? wrapper.steps : steps;
-                }
-                else
-                {
-                    var wrapper = JsonUtility.FromJson<StepsWrapper>(json);
-                    steps = wrapper != null ? wrapper.steps : steps;
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogWarning($"HandleMenu: Failed to parse instructions JSON: {ex.Message}");
-            }
-        }
+        Debug.Log("steps length: " + (steps != null ? steps.Length : 0));
 
         // Register listeners
         if (cubeToggle != null) cubeToggle.onValueChanged.AddListener(isOn => OnShapeToggleChanged(cubeToggle, isOn));
@@ -170,6 +148,12 @@ public class HandleMenu : MonoBehaviour
         if (unanchorToggle != null) unanchorToggle.onValueChanged.AddListener(isOn => OnUnanchorToggleChanged(isOn));
         if (autoExtendToggle != null) autoExtendToggle.onValueChanged.AddListener(isOn => OnAutoExtendToggleChanged(isOn));
 
+        // Tutorial toggle - show/hide tutorial board
+        if (tutorialToggle != null)
+        {
+            tutorialToggle.onValueChanged.AddListener(OnTutorialToggleChanged);
+        }
+
         // Subscribe to unanchor state changes for UI sync
         if (coordinateSpacePlacer == null)
         {
@@ -183,6 +167,12 @@ public class HandleMenu : MonoBehaviour
         // Step navigation buttons
         if (nextStepButton != null) nextStepButton.onClick.AddListener(OnNextStepClicked);
         if (prevStepButton != null) prevStepButton.onClick.AddListener(OnPrevStepClicked);
+
+        // Initialize tutorial board hidden state if toggle exists
+        if (tutorialBoard != null && tutorialToggle != null)
+        {
+            tutorialBoard.SetActive(tutorialToggle.isOn);
+        }
 
         // Initialize instruction UI
         UpdateInstructionUI();
@@ -200,6 +190,8 @@ public class HandleMenu : MonoBehaviour
         if (penToggle != null) penToggle.onValueChanged.RemoveAllListeners();
         if (unanchorToggle != null) unanchorToggle.onValueChanged.RemoveAllListeners();
         if (autoExtendToggle != null) autoExtendToggle.onValueChanged.RemoveAllListeners();
+
+        if (tutorialToggle != null) tutorialToggle.onValueChanged.RemoveAllListeners();
 
         if (nextStepButton != null) nextStepButton.onClick.RemoveAllListeners();
         if (prevStepButton != null) prevStepButton.onClick.RemoveAllListeners();
@@ -222,6 +214,26 @@ public class HandleMenu : MonoBehaviour
         }
     }
 
+    private void OnEnable()
+    {
+        UpdateInstructionUI();
+    }
+
+    // --- Tutorial show/hide ---
+    private void OnTutorialToggleChanged(bool isOn)
+    {
+        if (tutorialBoard == null)
+        {
+            Debug.LogWarning("HandleMenu: TutorialBoard GameObject is not assigned.");
+            return;
+        }
+
+        tutorialBoard.SetActive(isOn);
+
+        // Always refresh text content when the toggle changes
+        UpdateInstructionUI();
+    }
+
     // --- Step navigation logic ---
     private void OnNextStepClicked()
     {
@@ -237,54 +249,59 @@ public class HandleMenu : MonoBehaviour
     {
         int maxStep = (steps != null && steps.Length > 0) ? steps.Length - 1 : 0;
         int clamped = Mathf.Clamp(newIndex, 0, maxStep);
-        if (clamped != _stepIndex)
-        {
-            _stepIndex = clamped;
-            UpdateInstructionUI();
-        }
-        else
-        {
-            UpdateInstructionUI();
-        }
+        _stepIndex = clamped;
+        UpdateInstructionUI();
     }
 
     private void UpdateInstructionUI()
     {
-        bool hasSteps = steps != null && steps.Length > 0;
-        Step current = hasSteps ? steps[_stepIndex] : null;
+        // Diagnostics to confirm state
+        Debug.Log($"HandleMenu: stepsLen={(steps != null ? steps.Length : 0)}, stepIndex={_stepIndex}");
 
+        // Clamp index to available range
+        var stepsLen = steps != null ? steps.Length : 0;
+        if (stepsLen == 0)
+        {
+            if (instructionTitleText != null) instructionTitleText.text = "Step 1 - The Setup";
+            if (instructionObjectiveText != null) instructionObjectiveText.text = "Visualize the 3D workspace.";
+            if (instructionBodyText != null) instructionBodyText.text = "1. Trace...\n2. Draw...\n3. Draw...";
+            if (prevStepButton != null) prevStepButton.interactable = false;
+            if (nextStepButton != null) nextStepButton.interactable = false;
+            return;
+        }
+
+        _stepIndex = Mathf.Clamp(_stepIndex, 0, stepsLen - 1);
+        var current = steps[_stepIndex];
+
+        // Title/objective/instructions with safe fallbacks
         if (instructionTitleText != null)
-        {
-            instructionTitleText.text = hasSteps && !string.IsNullOrEmpty(current.title) ? current.title : string.Empty;
-        }
+            instructionTitleText.text = !string.IsNullOrEmpty(current?.title) ? current.title : "Step 1 - The Setup";
+
         if (instructionObjectiveText != null)
-        {
-            instructionObjectiveText.text = hasSteps && !string.IsNullOrEmpty(current.objective) ? current.objective : string.Empty;
-        }
+            instructionObjectiveText.text = !string.IsNullOrEmpty(current?.objective) ? current.objective : "Visualize the 3D workspace.";
+
         if (instructionBodyText != null)
         {
-            if (hasSteps && current.instructions != null && current.instructions.Length > 0)
+            var lines = (current?.instructions) ?? Array.Empty<string>();
+            if (lines.Length > 0)
             {
-                // Build numbered list
-                System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                for (int i = 0; i < current.instructions.Length; i++)
+                var sb = new System.Text.StringBuilder();
+                for (int i = 0; i < lines.Length; i++)
                 {
-                    sb.Append(i + 1).Append(". ").Append(current.instructions[i]);
-                    if (i < current.instructions.Length - 1) sb.Append('\n');
+                    sb.Append(i + 1).Append(". ").Append(lines[i]);
+                    if (i < lines.Length - 1) sb.Append('\n');
                 }
                 instructionBodyText.text = sb.ToString();
             }
             else
             {
-                instructionBodyText.text = string.Empty;
+                instructionBodyText.text = "1. Trace...\n2. Draw...\n3. Draw...";
             }
         }
 
-        // Enable/disable step buttons appropriately
-        if (prevStepButton != null) prevStepButton.interactable = hasSteps && _stepIndex > 0;
-        if (nextStepButton != null) nextStepButton.interactable = hasSteps && _stepIndex < (steps.Length - 1);
+        if (prevStepButton != null) prevStepButton.interactable = _stepIndex > 0;
+        if (nextStepButton != null) nextStepButton.interactable = _stepIndex < (stepsLen - 1);
     }
-
     // --- NEW PEN LOGIC ---
     private void OnPenToggleChanged(bool isOn)
     {
@@ -300,27 +317,16 @@ public class HandleMenu : MonoBehaviour
 
     private void SpawnPen()
     {
-        // 1. Check if pen already exists
         if (currentPenInstance != null) return;
-
-        // 2. Check if we have a prefab
         if (penPrefab == null)
         {
             Debug.LogWarning("HandleMenu: Pen Prefab is not assigned in Inspector!");
             return;
         }
 
-        // 3. Find User's Head (Main Camera)
         Transform headTransform = Camera.main.transform;
-
-        // 4. Calculate Position (Front of face)
         Vector3 spawnPos = headTransform.position + (headTransform.forward * penSpawnDistance);
-
-        // 5. Instantiate (We do NOT parent to coordinate space, so you can pick it up freely)
         currentPenInstance = Instantiate(penPrefab, spawnPos, Quaternion.identity);
-
-        // Optional: Rotate pen to face the user roughly, or keep identity
-        // currentPenInstance.transform.LookAt(headTransform); 
     }
 
     private void DestroyPen()
@@ -338,7 +344,6 @@ public class HandleMenu : MonoBehaviour
     {
         if (coordinateSpacePlacer == null)
         {
-            // Try to find it
             coordinateSpacePlacer = FindFirstObjectByType<CoordinateSpacePlacer>();
             if (coordinateSpacePlacer == null)
             {
@@ -364,7 +369,6 @@ public class HandleMenu : MonoBehaviour
     {
         if (unanchorToggle != null)
         {
-            // Temporarily remove listener to avoid triggering callback
             unanchorToggle.onValueChanged.RemoveListener(OnUnanchorToggleChanged);
             unanchorToggle.isOn = isUnanchored;
             unanchorToggle.onValueChanged.AddListener(isOn => OnUnanchorToggleChanged(isOn));
@@ -440,7 +444,6 @@ public class HandleMenu : MonoBehaviour
             if (renderer != null) renderer.material = shapeMaterial;
         }
 
-        // Configure grabbable/interaction components (Rigidbody, Grabbable, transformers, template wiring)
         EnsureGrabbableSetup(originShape);
     }
 
@@ -462,7 +465,6 @@ public class HandleMenu : MonoBehaviour
         var mf = originShape.AddComponent<MeshFilter>();
         var mr = originShape.AddComponent<MeshRenderer>();
 
-        // Assumes you have ProceduralCone class elsewhere
         mf.sharedMesh = ProceduralCone.Build(0.5f, 1f, 32, capBase: true);
 
         var mc = originShape.AddComponent<MeshCollider>();
@@ -531,16 +533,10 @@ public class HandleMenu : MonoBehaviour
         return new Vector3(ext.x * s.x, ext.y * s.y, ext.z * s.z);
     }
 
-    /// <summary>
-    /// Clone template under shape and wire Grabbable, ColliderSurface, Collider and PointableElement dependencies.
-    /// Fixes "collider surface" and "pointable element" unassigned warnings.
-    /// Also assigns Ray Interaction script's pointableElement to the shape's PointableElement.
-    /// </summary>
     private void AttachAndWireISDKRayGrabInteraction(GameObject parentShape, Grabbable grabbable)
     {
         if (parentShape == null || grabbable == null) return;
 
-        // Ensure the shape has a Collider
         var shapeCollider = parentShape.GetComponent<Collider>();
         if (shapeCollider == null)
         {
@@ -558,19 +554,15 @@ public class HandleMenu : MonoBehaviour
             }
         }
 
-        // Ensure a PointableElement exists on the shape
         var pointable = parentShape.GetComponent<PointableElement>();
         if (pointable == null) pointable = parentShape.AddComponent<PointableElement>();
 
-        // Ensure a ColliderSurface exists (attach to the shape so it references its collider)
         var surface = parentShape.GetComponent<ColliderSurface>();
         if (surface == null) surface = parentShape.AddComponent<ColliderSurface>();
-        // ColliderSurface has a private serialized field; assign via reflection for runtime wiring
         var surfaceType = typeof(ColliderSurface);
         var colliderField = surfaceType.GetField("_collider", BindingFlags.NonPublic | BindingFlags.Instance);
         if (colliderField != null) colliderField.SetValue(surface, shapeCollider);
 
-        // Get template to clone
         var template = isdkRayGrabInteractionTemplate != null ? isdkRayGrabInteractionTemplate : GameObject.Find("ISDK_RayGrabInteraction");
         if (template == null)
         {
@@ -586,14 +578,12 @@ public class HandleMenu : MonoBehaviour
         var cloneRayInteractable = clone.GetComponent<RayInteractable>();
         cloneRayInteractable.InjectOptionalPointableElement(grabbable);
 
-        // Walk components on the cloned template and assign references
         var comps = clone.GetComponents<MonoBehaviour>();
         foreach (var comp in comps)
         {
             if (comp == null) continue;
             var t = comp.GetType();
 
-            // Assign fields
             var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             foreach (var f in fields)
             {
@@ -619,7 +609,6 @@ public class HandleMenu : MonoBehaviour
                 }
             }
 
-            // Assign properties (when writable)
             var props = t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             foreach (var p in props)
             {
@@ -646,7 +635,6 @@ public class HandleMenu : MonoBehaviour
                     continue;
                 }
 
-                // If a script exposes a property named "pointableElement" regardless of type checks, attempt assignment
                 if (p.Name.ToLower().Contains("pointableelement") && p.CanWrite)
                 {
                     try { p.SetValue(comp, pointable, null); } catch { }
@@ -668,10 +656,8 @@ public class HandleMenu : MonoBehaviour
             var grabbable = shape.GetComponent<Grabbable>();
             if (grabbable == null) grabbable = shape.AddComponent<Grabbable>();
 
-            // Assign the shape's Rigidbody to the Grabbable via reflection (handles private serialized field)
             grabbable.InjectOptionalRigidbody(rb);
 
-            // Ensure PointableElement exists on the same shape (used by ray interaction)
             var pointable = shape.GetComponent<PointableElement>();
             if (pointable == null) pointable = shape.AddComponent<PointableElement>();
 
