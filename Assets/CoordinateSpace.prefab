@@ -58,7 +58,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: e823cd5b5d27c0f4b8256e7c12ee3e6d, type: 2}
+  - {fileID: 2100000, guid: e40ef710376504e1b9e225d9a4701278, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -200,7 +200,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: e823cd5b5d27c0f4b8256e7c12ee3e6d, type: 2}
+  - {fileID: 2100000, guid: e40ef710376504e1b9e225d9a4701278, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -331,19 +331,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6941c7ce5c876be47bc4c8b2d041b12f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  maxAxisLength: 5
+  maxAxisLength: 3
+  extensionThreshold: 10
+  extensionAmount: 20
+  autoExtendEnabled: 0
   xAxisColor: {r: 1, g: 0, b: 0, a: 1}
   yAxisColor: {r: 0, g: 1, b: 0, a: 1}
   zAxisColor: {r: 0, g: 0, b: 1, a: 1}
-  axisWidth: 0.03
+  axisWidth: 0.01
   showTicks: 1
-  tickSpacing: 1
-  tickSize: 0.1
+  tickSpacing: 0.25
+  tickSize: 0.05
   tickWidth: 0.005
   showGrids: 0
   gridColor: {r: 1, g: 1, b: 1, a: 0.3}
   gridWidth: 0.005
-  gridToggleButton: 2
+  gridToggleButton: 0
   inputController: 2
   xAxisLine: {fileID: 9169805335018199739}
   yAxisLine: {fileID: 5413711984137789336}
@@ -407,7 +410,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: e823cd5b5d27c0f4b8256e7c12ee3e6d, type: 2}
+  - {fileID: 2100000, guid: e40ef710376504e1b9e225d9a4701278, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
